@@ -1,3 +1,4 @@
+// backend/index.js
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
@@ -5,48 +6,38 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import patientsRouter from "./routes/patients.js";  // your existing routes
-import authRouter from "./routes/auth.js";          // auth routes
+import patientsRouter from "./routes/patients.js";
+import authRouter from "./routes/auth.js";
 
 dotenv.config();
 
-// Fix __dirname inside ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Init app
 const app = express();
 
-// =========================
-//        MIDDLEWARE
-// =========================
 app.use(cors());
 app.use(express.json());
 
-// =========================
-//          API ROUTES
-// =========================
+// ROUTES
 app.use("/api/patients", patientsRouter);
 app.use("/api/auth", authRouter);
 
-// Simple health endpoint
+// HEALTH CHECK
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", ts: new Date().toISOString() });
+  res.json({ status: "ok", time: new Date().toISOString() });
 });
 
-// =========================
-//   SERVE REACT BUILD
-// =========================
+// STATIC (Production)
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../../client/build")));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../../client/build/index.html"));
-  });
+  const clientPath = path.join(__dirname, "../client/dist");
+  app.use(express.static(clientPath));
+  app.get("*", (_, res) =>
+    res.sendFile(path.join(clientPath, "index.html"))
+  );
 }
 
-// =========================
-//        DATABASE
-// =========================
+// DATABASE CONNECTION
 const PORT = process.env.PORT || 9000;
 const MONGO_URI = process.env.MONGO_URI;
 
@@ -57,16 +48,14 @@ if (!MONGO_URI) {
 
 mongoose
   .connect(MONGO_URI, {
-    dbName: "patient_auth",
+    dbName: "patient_auth",   // ✅ FIXED
   })
   .then(() => {
-    console.log("✅ Connected to MongoDB (ayurveda)");
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-    });
+    console.log("✅ Connected to MongoDB (patient_auth)");
+    app.listen(PORT, () =>
+      console.log(`🚀 Server running at http://localhost:${PORT}`)
+    );
   })
-  .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
-  });
+  .catch((err) => console.error("❌ MongoDB Error:", err));
 
 export default app;

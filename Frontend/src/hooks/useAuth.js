@@ -1,5 +1,5 @@
 // src/hooks/useAuth.js
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 
 const AUTH_TOKEN_KEY = "authToken";
 const AUTH_USER_KEY = "currentUser";
@@ -13,11 +13,21 @@ const safeParse = (value) => {
 };
 
 const useAuth = () => {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY) || null;
-  const user = useMemo(
-    () => safeParse(localStorage.getItem(AUTH_USER_KEY)),
-    []
-  );
+  const [token, setToken] = useState(localStorage.getItem(AUTH_TOKEN_KEY));
+  const [user, setUser] = useState(safeParse(localStorage.getItem(AUTH_USER_KEY)));
+
+  // Automatically re-check localStorage whenever login happens
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newToken = localStorage.getItem(AUTH_TOKEN_KEY);
+      const newUser = safeParse(localStorage.getItem(AUTH_USER_KEY));
+
+      setToken(newToken);
+      setUser(newUser);
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const isAuthenticated = !!token && !!user;
   const isDoctor = user?.role === "doctor";

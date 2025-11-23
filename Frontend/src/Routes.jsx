@@ -1,4 +1,3 @@
-// src/AppRoutes.jsx (or wherever this file is)
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 
@@ -6,91 +5,81 @@ import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 import NotFound from "pages/NotFound";
 
-import AyurvedicIntelligenceCenter from "./pages/ayurvedic-intelligence-center";
-import PersonalWellnessHub from "./pages/personal-wellness-hub";
+// Main Pages
 import HomepageAyurNutriPlatform from "./pages/homepage-ayur-nutri-platform";
+import AyurvedicIntelligenceCenter from "./pages/ayurvedic-intelligence-center";
+import ClinicalResearchLibrary from "./pages/clinical-research-library";
+
+// Portals
+import PersonalWellnessHub from "./pages/personal-wellness-hub";
 import ProfessionalDashboardPortal from "./pages/professional-dashboard-portal";
 
+// Auth Pages
+
 import SignInPage from "./pages/sign-in/SignInPage";
+import SignInDoctor from "./pages/sign-in/SignInDoctor";
 import SignupPatient from "./pages/sign-in/SignupPatient";
 import SignupDoctor from "./pages/sign-in/SignupDoctor";
 import ResetPassword from "./pages/sign-in/ResetPassword";
-import SignInDoctor from "./pages/sign-in/SignInDoctor";
 
-import ClinicalResearchLibrary from "./pages/clinical-research-library";
+// FIXED IMPORT (add /index.jsx)
+import AuthSelectionPage from "./pages/auth-selection/index.jsx";
 
 import useAuth from "./hooks/useAuth";
+
 
 // ========= AUTH GUARDS ========= //
 
 const RequireAuth = () => {
   const { isAuthenticated } = useAuth();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/signin" replace />;
-  }
-
-  return <Outlet />;
+  return isAuthenticated ? <Outlet /> : <Navigate to="/signin" replace />;
 };
 
 const RequireDoctorAuth = () => {
   const { isAuthenticated, isDoctor } = useAuth();
-
-  if (!isAuthenticated || !isDoctor) {
-    return <Navigate to="/signin" replace />;
-  }
-
-  return <Outlet />;
+  return isAuthenticated && isDoctor
+    ? <Outlet />
+    : <Navigate to="/signin/doctor" replace />;
 };
+
+
+// ========= ROUTES ========= //
 
 const AppRoutes = () => {
   return (
     <BrowserRouter>
       <ErrorBoundary>
         <ScrollToTop />
+
         <Routes>
-          {/* Auth */}
+          {/* AUTH AREA */}
+          <Route path="/join" element={<AuthSelectionPage />} />
           <Route path="/signin" element={<SignInPage />} />
+          <Route path="/signin/doctor" element={<SignInDoctor />} />
           <Route path="/signup" element={<SignupPatient />} />
           <Route path="/signup/doctor" element={<SignupDoctor />} />
-          <Route path="/signin/doctor" element={<SignInDoctor />} />
           <Route path="/reset" element={<ResetPassword />} />
-          
 
-          {/* Main public */}
+          {/* PUBLIC PAGES */}
           <Route path="/" element={<HomepageAyurNutriPlatform />} />
-          <Route
-            path="/homepage-ayur-nutri-platform"
-            element={<HomepageAyurNutriPlatform />}
-          />
-          <Route
-            path="/ayurvedic-intelligence-center"
-            element={<AyurvedicIntelligenceCenter />}
-          />
-          <Route
-            path="/clinical-research-library"
-            element={<ClinicalResearchLibrary />}
-          />
+          <Route path="/homepage-ayur-nutri-platform" element={<HomepageAyurNutriPlatform />} />
+          <Route path="/ayurvedic-intelligence-center" element={<AyurvedicIntelligenceCenter />} />
+          <Route path="/clinical-research-library" element={<ClinicalResearchLibrary />} />
 
-          {/* Protected patient route */}
+          {/* PATIENT DASHBOARD */}
           <Route element={<RequireAuth />}>
-            <Route
-              path="/personal-wellness-hub"
-              element={<PersonalWellnessHub />}
-            />
+            <Route path="/personal-wellness-hub" element={<PersonalWellnessHub />} />
           </Route>
 
-          {/* Protected doctor route */}
+          {/* DOCTOR DASHBOARD */}
           <Route element={<RequireDoctorAuth />}>
-            <Route
-              path="/professional-dashboard-portal"
-              element={<ProfessionalDashboardPortal />}
-            />
+            <Route path="/professional-dashboard-portal" element={<ProfessionalDashboardPortal />} />
           </Route>
 
-          {/* 404 */}
+          {/* CATCH-ALL */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+
       </ErrorBoundary>
     </BrowserRouter>
   );
