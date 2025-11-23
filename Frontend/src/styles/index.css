@@ -1,0 +1,51 @@
+
+:root{
+  --ayur-primary: #0F6C3F;
+  --ayur-mint: #E8F7EE;
+  --ayur-beige: #E8E2D9;
+  --ayur-border: #D6D1C9;
+  --ayur-text-dark: #2A2A2A;
+  --ayur-text-med: #555555;
+  --ayur-bg: #FAF9F6;
+}
+
+/* Background + text helpers */
+.bg-cream { background-color: var(--ayur-bg); }
+.bg-beige { background-color: var(--ayur-beige); }
+.text-primary { color: var(--ayur-primary); }
+.text-muted { color: var(--ayur-text-med); }
+.border-ayur { border-color: var(--ayur-border); }
+
+/* Card hover lift effect */
+.card-hover {
+  transition: transform .22s ease, box-shadow .22s ease;
+}
+.card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 30px rgba(16,24,32,0.08);
+}
+
+/* Subtle fade-up animation */
+.fade-up {
+  transform: translateY(6px);
+  opacity: 0;
+  transition: all .36s ease;
+}
+.fade-up.in-view {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Inter;
+}
+
+* {
+  box-sizing: border-box;
+  line-height: normal;
+  font-family: inherit;
+  margin: unset;
+}

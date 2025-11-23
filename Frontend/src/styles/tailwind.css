@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600&display=swap');
+@import 'react-toastify/dist/ReactToastify.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Primary Colors */
+    --color-primary: #2D5016; /* deep-forest-green */
+    --color-primary-foreground: #FFFFFF; /* white */
+    
+    /* Secondary Colors */
+    --color-secondary: #D4AF37; /* warm-gold */
+    --color-secondary-foreground: #1A1A1A; /* gray-900 */
+    
+    /* Accent Colors */
+    --color-accent: #87A96B; /* calming-sage */
+    --color-accent-foreground: #1A1A1A; /* gray-900 */
+    
+    /* Background Colors */
+    --color-background: #FEFEFE; /* pure-canvas */
+    --color-foreground: #1A1A1A; /* gray-900 */
+    
+    /* Surface Colors */
+    --color-card: #F8F9F6; /* subtle-green-surface */
+    --color-card-foreground: #1A1A1A; /* gray-900 */
+    --color-popover: #FFFFFF; /* white */
+    --color-popover-foreground: #1A1A1A; /* gray-900 */
+    
+    /* Muted Colors */
+    --color-muted: #F7F3E9; /* warm-cream */
+    --color-muted-foreground: #4A5568; /* gray-600 */
+    
+    /* Border and Input */
+    --color-border: #E8E3D8; /* warm-gray-200 */
+    --color-input: #FFFFFF; /* white */
+    --color-ring: #87A96B; /* calming-sage */
+    
+    /* Status Colors */
+    --color-success: #22543D; /* earthy-green */
+    --color-success-foreground: #FFFFFF; /* white */
+    --color-warning: #C05621; /* warm-amber */
+    --color-warning-foreground: #FFFFFF; /* white */
+    --color-error: #9B2C2C; /* muted-red */
+    --color-error-foreground: #FFFFFF; /* white */
+    --color-destructive: #9B2C2C; /* muted-red */
+    --color-destructive-foreground: #FFFFFF; /* white */
+    
+    /* Text Hierarchy */
+    --color-text-primary: #1A1A1A; /* gray-900 */
+    --color-text-secondary: #4A5568; /* gray-600 */
+    
+    /* Brand Specific */
+    --color-brand-gold: #B8860B; /* rich-gold */
+    --color-brand-forest: #1A2F0A; /* deep-forest */
+    --color-brand-sage: #87A96B; /* calming-sage */
+    --color-brand-cream: #F7F3E9; /* warm-cream */
+    --color-brand-ivory: #FEFCF8; /* soft-ivory */
+    
+    /* Shadows */
+    --shadow-organic: 0 4px 12px rgba(45, 80, 22, 0.08);
+    --shadow-elevated: 0 4px 20px rgba(45, 80, 22, 0.08);
+    
+    /* Border Radius */
+    --radius: 6px;
+  }
+  
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+  
+  .font-accent {
+    font-family: 'Crimson Text', serif;
+  }
+}
+
+@layer components {
+  .organic-shadow {
+    box-shadow: var(--shadow-organic);
+  }
+  
+  .elevated-shadow {
+    box-shadow: var(--shadow-elevated);
+  }
+  
+  .organic-transition {
+    transition: all 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .gentle-transition {
+    transition: all 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
