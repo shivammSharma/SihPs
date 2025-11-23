@@ -1,96 +1,112 @@
-// server/routes/patients.js
-import express from 'express';
-import Patient from '../models/Patient.js';
+import express from "express";
+import ClinicalPatient from "../models/ClinicalPatient.js";
 
 const router = express.Router();
 
-// GET /api/patients -> list patients
-router.get('/', async (req, res) => {
+/**
+ * GET /api/patients
+ * Fetch all clinical patients with filters
+ */
+router.get("/", async (req, res) => {
   try {
     const { status, dosha, q } = req.query;
     const filter = {};
 
-    if (status && status !== 'all') filter.status = status;
-    if (dosha && dosha !== 'all') filter.dosha = new RegExp(dosha, 'i');
-    if (q) filter.name = new RegExp(q, 'i');
+    if (status && status !== "all") filter.status = status;
+    if (dosha && dosha !== "all") filter.dosha = new RegExp(dosha, "i");
+    if (q) filter.name = new RegExp(q, "i");
 
-    const patients = await Patient.find(filter).sort({ createdAt: -1 });
-    res.json(patients);
+    const patients = await ClinicalPatient.find(filter).sort({ createdAt: -1 });
+    return res.json(patients);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("GET /api/patients ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
-// POST /api/patients -> create patient
-router.post('/', async (req, res) => {
+/**
+ * POST /api/patients
+ * Create a new clinical patient
+ */
+router.post("/", async (req, res) => {
   try {
     const {
-      name, age, dosha, condition, status,
-      lastVisit, nextAppointment, progress
-    } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: 'Name is required' });
-    }
-
-    const patient = new Patient({
       name,
       age,
       dosha,
       condition,
-      status: status || 'new',
+      status,
+      lastVisit,
+      nextAppointment,
+      progress
+    } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "Name is required" });
+    }
+
+    const patient = new ClinicalPatient({
+      name,
+      age,
+      dosha,
+      condition,
+      status: status || "new",
       lastVisit: lastVisit ? new Date(lastVisit) : null,
       nextAppointment: nextAppointment ? new Date(nextAppointment) : null,
       progress: progress ?? 0
     });
 
     const saved = await patient.save();
-    res.status(201).json(saved);
+    return res.status(201).json(saved);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("POST /api/patients ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
-// PUT /api/patients/:id -> update patient
-router.put('/:id', async (req, res) => {
+/**
+ * PUT /api/patients/:id
+ * Update a clinical patient
+ */
+router.put("/:id", async (req, res) => {
   try {
-    const updates = req.body;
-
-    const patient = await Patient.findByIdAndUpdate(
+    const updated = await ClinicalPatient.findByIdAndUpdate(
       req.params.id,
-      updates,
+      req.body,
       { new: true }
     );
 
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+    if (!updated) {
+      return res.status(404).json({ error: "Patient not found" });
     }
 
-    res.json(patient);
+    return res.json(updated);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("PUT /api/patients/:id ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
-// DELETE /api/patients/:id -> delete
-router.delete('/:id', async (req, res) => {
+/**
+ * DELETE /api/patients/:id
+ * Remove patient
+ */
+router.delete("/:id", async (req, res) => {
   try {
-    const patient = await Patient.findByIdAndDelete(req.params.id);
+    const deleted = await ClinicalPatient.findByIdAndDelete(req.params.id);
 
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+    if (!deleted) {
+      return res.status(404).json({ error: "Patient not found" });
     }
 
-    res.json({ message: 'Deleted', id: req.params.id });
+    return res.json({ message: "Deleted", id: req.params.id });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("DELETE /api/patients/:id ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
