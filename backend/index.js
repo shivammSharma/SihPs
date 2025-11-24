@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 
 import patientsRouter from "./routes/patients.js";
 import authRouter from "./routes/auth.js";
+import subscriberRouter from "./routes/subscriber.js";  // ✅ NEW
 
 dotenv.config();
 
@@ -16,28 +17,41 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// ------------------------
+// Middlewares
+// ------------------------
 app.use(cors());
 app.use(express.json());
 
+// ------------------------
 // ROUTES
+// ------------------------
 app.use("/api/patients", patientsRouter);
 app.use("/api/auth", authRouter);
+app.use("/api", subscriberRouter);   // ✅ NEW (POST /api/subscribe)
 
+// ------------------------
 // HEALTH CHECK
+// ------------------------
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
-// STATIC (Production)
+// ------------------------
+// STATIC (Production build)
+// ------------------------
 if (process.env.NODE_ENV === "production") {
   const clientPath = path.join(__dirname, "../client/dist");
   app.use(express.static(clientPath));
+
   app.get("*", (_, res) =>
     res.sendFile(path.join(clientPath, "index.html"))
   );
 }
 
+// ------------------------
 // DATABASE CONNECTION
+// ------------------------
 const PORT = process.env.PORT || 9000;
 const MONGO_URI = process.env.MONGO_URI;
 
@@ -48,7 +62,7 @@ if (!MONGO_URI) {
 
 mongoose
   .connect(MONGO_URI, {
-    dbName: "patient_auth",   // ✅ FIXED
+    dbName: "patient_auth",
   })
   .then(() => {
     console.log("✅ Connected to MongoDB (patient_auth)");
