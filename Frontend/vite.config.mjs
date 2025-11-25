@@ -19,7 +19,7 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: ['.amazonaws.com', '.builtwithrocket.new'],
     proxy: {
-      '/api': { target: 'http://localhost:5000', changeOrigin: true }
+      '/api': { target: 'http://localhost:9000', changeOrigin: true }
     
   }
 

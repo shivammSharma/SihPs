@@ -1,50 +1,57 @@
-// src/pages/sign-up/PatientSignup.jsx
+// src/pages/sign-in/SignupPatient.jsx (or your path)
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 
+// 👇 Use the same backend base as the rest of your app
+// Make sure VITE_API_BASE_URL is set to "http://localhost:9000" in your .env
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
-const PatientSignup = () => {
+const SignupPatient = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    phoneNumber: "",
-    gender: "",
-  });
-  const [loading, setLoading] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [gender, setGender] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const handleChange = (field) => (value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
 
-    if (
-      !form.fullName ||
-      !form.email ||
-      !form.password ||
-      !form.phoneNumber ||
-      !form.gender
-    ) {
+    // basic validation
+    if (!fullName || !email || !phoneNumber || !gender || !password) {
       setErrorMsg("Please fill all required fields.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg("Password should be at least 6 characters long.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg("Passwords do not match.");
       return;
     }
 
     try {
       setLoading(true);
 
-      const res = await axios.post(
-        `${API_BASE}/api/auth/signup/patient`,
-        form
-      );
+      // send to backend: /api/auth/signup/patient
+      const res = await axios.post(`${API_BASE}/api/auth/signup/patient`, {
+        fullName: fullName.trim(),
+        email: email.trim(),
+        password,
+        phoneNumber: phoneNumber.trim(),
+        gender: gender.trim(),
+      });
 
       const { token, user } = res.data || {};
 
@@ -55,11 +62,13 @@ const PatientSignup = () => {
         localStorage.setItem("currentUser", JSON.stringify(user));
       }
 
+      // go to patient dashboard
       navigate("/personal-wellness-hub");
     } catch (err) {
       console.error("PATIENT SIGNUP ERROR:", err);
       const msg =
-        err?.response?.data?.message || "Signup failed. Please try again.";
+        err?.response?.data?.message ||
+        "Sign up failed. Please check your details and try again.";
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -67,83 +76,132 @@ const PatientSignup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background/60 py-12">
-      <div className="w-full max-w-lg bg-card rounded-2xl border-4 border-border p-6 sm:p-8 shadow-sm">
-        <h2 className="text-xl font-semibold mb-4 text-center">
-          Patient Signup
-        </h2>
+    <div className="min-h-screen bg-[#fdf7ee] bg-gradient-to-b from-[#fdf7ee] via-[#f6f0e5] to-[#f3ecdf] flex flex-col">
+      <div className="h-20" />
 
-        {errorMsg && (
-          <div className="mb-3 text-center text-xs sm:text-sm text-red-600 font-medium">
-            {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            className="w-full border-2 border-border rounded-md py-2.5 px-3 text-sm"
-            placeholder="Full Name"
-            value={form.fullName}
-            onChange={(e) => handleChange("fullName")(e.target.value)}
-          />
-          <input
-            className="w-full border-2 border-border rounded-md py-2.5 px-3 text-sm"
-            placeholder="Email"
-            type="email"
-            value={form.email}
-            onChange={(e) => handleChange("email")(e.target.value)}
-          />
-          <input
-            className="w-full border-2 border-border rounded-md py-2.5 px-3 text-sm"
-            placeholder="Phone Number"
-            value={form.phoneNumber}
-            onChange={(e) => handleChange("phoneNumber")(e.target.value)}
-          />
-          <select
-            className="w-full border-2 border-border rounded-md py-2.5 px-3 text-sm"
-            value={form.gender}
-            onChange={(e) => handleChange("gender")(e.target.value)}
-          >
-            <option value="">Select gender</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
-          <input
-            className="w-full border-2 border-border rounded-md py-2.5 px-3 text-sm"
-            placeholder="Password"
-            type="password"
-            value={form.password}
-            onChange={(e) => handleChange("password")(e.target.value)}
-          />
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-primary text-primary-foreground px-6 py-2 disabled:opacity-60"
-          >
-            {loading ? "SIGNING UP..." : "SIGNUP"}
-          </Button>
-
-          {/* Existing: patient already has account */}
-          <div className="text-center text-sm mt-2">
-            Already have an account?{" "}
-            <Link to="/signin" className="text-primary font-medium">
-              Login
-            </Link>
+      <main className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="max-w-5xl w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 items-center animate-fadeInUp">
+          {/* Left text */}
+          <div className="hidden md:block">
+            <p className="text-sm uppercase tracking-[0.2em] text-emerald-700/80 font-semibold mb-3">
+              For Users
+            </p>
+            <h1 className="text-3xl font-serif font-semibold text-[#1f2933] mb-4">
+              Begin your{" "}
+              <span className="text-emerald-700">
+                Ayurvedic wellness journey
+              </span>
+              .
+            </h1>
+            <p className="text-[#4b5563] text-base mb-4">
+              Create a free account to unlock personalized diet plans, guided
+              insights, and holistic recommendations aligned with your dosha.
+            </p>
+            <ul className="text-sm text-[#374151] space-y-1">
+              <li>• Personalized nutrition & lifestyle guidance</li>
+              <li>• Progress dashboards and insights</li>
+              <li>• Easy access to Ayurvedic experts</li>
+            </ul>
           </div>
 
-          {/* NEW: Doctor login section */}
-          <div className="text-center text-sm mt-2 border-t border-border pt-3">
-            Are you a doctor?{" "}
-            <Link to="/signin/doctor" className="text-primary font-medium">
-              Login to Doctor Portal
-            </Link>
+          {/* Right form */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-emerald-900/5 p-6 sm:p-8">
+            <div className="mb-6">
+              <p className="text-xs uppercase tracking-[0.18em] text-emerald-700/80 font-semibold mb-2">
+                Create account
+              </p>
+              <h2 className="text-2xl font-semibold text-[#111827]">
+                User profile
+              </h2>
+              <p className="text-sm text-[#6b7280] mt-1">
+                It only takes a moment to set up your profile.
+              </p>
+            </div>
+
+            {errorMsg && (
+              <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {errorMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                label="Full Name"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+
+              <Input
+                label="Email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+
+              <Input
+                label="Phone Number"
+                required
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="98xxxxxx"
+              />
+
+              <Input
+                label="Gender"
+                required
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                placeholder="e.g. Male, Female, Non-binary"
+              />
+
+              <Input
+                label="Password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+              />
+
+              <Input
+                label="Confirm Password"
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter your password"
+              />
+
+              <div className="flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-[#6b7280]">
+                  Already have an account?{" "}
+                  <Link
+                    to="/signin"
+                    className="text-emerald-700 font-semibold hover:underline"
+                  >
+                    Sign in
+                  </Link>
+                </span>
+              </div>
+
+              <Button
+                type="submit"
+                loading={loading}
+                fullWidth
+                size="lg"
+                className="mt-2 bg-[#0f766e] hover:bg-[#115e59] shadow-md shadow-emerald-700/30"
+              >
+                Create User Account
+              </Button>
+            </form>
           </div>
-        </form>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };
 
-export default PatientSignup;
+export default SignupPatient;

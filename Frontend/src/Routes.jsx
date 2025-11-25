@@ -1,47 +1,27 @@
-// src/AppRoutes.jsx (or wherever this file is)
+// src/Routes.jsx
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 import NotFound from "pages/NotFound";
 
-import AyurvedicIntelligenceCenter from "./pages/ayurvedic-intelligence-center";
-import PersonalWellnessHub from "./pages/personal-wellness-hub";
+// Main pages
 import HomepageAyurNutriPlatform from "./pages/homepage-ayur-nutri-platform";
+import AyurvedicIntelligenceCenter from "./pages/ayurvedic-intelligence-center";
+import ClinicalResearchLibrary from "./pages/clinical-research-library";
+import PersonalWellnessHub from "./pages/personal-wellness-hub";
 import ProfessionalDashboardPortal from "./pages/professional-dashboard-portal";
 
-import SignInPage from "./pages/sign-in/SignInPage";
-import SignupPatient from "./pages/sign-in/SignupPatient";
-import SignupDoctor from "./pages/sign-in/SignupDoctor";
+// Auth pages
+import SignInPage from "./pages/sign-in/SignInPage";          // patient login
+import SignInDoctor from "./pages/sign-in/SignInDoctor";      // doctor login (if you have this)
+import SignupPatient from "./pages/sign-in/SignupPatient";    // patient signup
+import SignupDoctor from "./pages/sign-in/SignupDoctor";      // doctor signup
 import ResetPassword from "./pages/sign-in/ResetPassword";
-import SignInDoctor from "./pages/sign-in/SignInDoctor";
 
-import ClinicalResearchLibrary from "./pages/clinical-research-library";
-
-import useAuth from "./hooks/useAuth";
-
-// ========= AUTH GUARDS ========= //
-
-const RequireAuth = () => {
-  const { isAuthenticated } = useAuth();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/signin" replace />;
-  }
-
-  return <Outlet />;
-};
-
-const RequireDoctorAuth = () => {
-  const { isAuthenticated, isDoctor } = useAuth();
-
-  if (!isAuthenticated || !isDoctor) {
-    return <Navigate to="/signin" replace />;
-  }
-
-  return <Outlet />;
-};
+// Diet builder (doctor)
+import DoctorDietBuilderPage from "./pages/professional-dashboard-portal/components/DoctorDietBuilderPage.jsx";
 
 const AppRoutes = () => {
   return (
@@ -49,16 +29,18 @@ const AppRoutes = () => {
       <ErrorBoundary>
         <ScrollToTop />
         <Routes>
-          {/* Auth */}
+          {/* Auth routes */}
           <Route path="/signin" element={<SignInPage />} />
+          <Route path="/signin/doctor" element={<SignInDoctor />} />
           <Route path="/signup" element={<SignupPatient />} />
           <Route path="/signup/doctor" element={<SignupDoctor />} />
-          <Route path="/signin/doctor" element={<SignInDoctor />} />
           <Route path="/reset" element={<ResetPassword />} />
-          
 
-          {/* Main public */}
-          <Route path="/" element={<HomepageAyurNutriPlatform />} />
+          {/* Public / main pages */}
+          <Route
+            path="/"
+            element={<HomepageAyurNutriPlatform />}
+          />
           <Route
             path="/homepage-ayur-nutri-platform"
             element={<HomepageAyurNutriPlatform />}
@@ -72,23 +54,25 @@ const AppRoutes = () => {
             element={<ClinicalResearchLibrary />}
           />
 
-          {/* Protected patient route */}
-          <Route element={<RequireAuth />}>
-            <Route
-              path="/personal-wellness-hub"
-              element={<PersonalWellnessHub />}
-            />
-          </Route>
+          {/* Patient dashboard */}
+          <Route
+            path="/personal-wellness-hub"
+            element={<PersonalWellnessHub />}
+          />
 
-          {/* Protected doctor route */}
-          <Route element={<RequireDoctorAuth />}>
-            <Route
-              path="/professional-dashboard-portal"
-              element={<ProfessionalDashboardPortal />}
-            />
-          </Route>
+          {/* Doctor dashboard */}
+          <Route
+            path="/professional-dashboard-portal"
+            element={<ProfessionalDashboardPortal />}
+          />
 
-          {/* 404 */}
+          {/* Full-screen diet builder for a specific patient */}
+          <Route
+            path="/doctor/diet-builder/:patientId"
+            element={<DoctorDietBuilderPage />}
+          />
+
+          {/* Fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </ErrorBoundary>

@@ -94,7 +94,7 @@ const PlatformShowcase = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveTab((prev) => (prev + 1) % showcaseItems?.length);
-    }, 5000);
+    }, 9000);
     return () => clearInterval(interval);
   }, []);
 

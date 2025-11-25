@@ -1,218 +1,149 @@
-// src/pages/sign-in/SignInPage.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import Icon from "../../components/AppIcon";
+import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 
-const MODE = "patientLogin"; // reserved for future expansion
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
-
-const BrandLogo = () => (
-  <div className="flex items-center gap-3">
-    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-primary/10">
-      <Icon name="Leaf" size={18} className="text-primary" />
-    </div>
-    <div>
-      <div className="text-xl lg:text-2xl font-display font-semibold text-primary leading-tight">
-        AyurNutri
-      </div>
-      <div className="text-xs text-text-secondary">
-        Ancient Wisdom • Modern Precision
-      </div>
-    </div>
-  </div>
-);
-
-const AuthInput = ({
-  placeholder,
-  value,
-  onChange,
-  type = "text",
-  name,
-  autoComplete,
-}) => (
-  <input
-    type={type}
-    name={name}
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    placeholder={placeholder}
-    autoComplete={autoComplete}
-    aria-label={placeholder}
-    className="w-full border-2 border-border rounded-md py-2.5 px-3 text-sm text-center placeholder:text-primary/60 focus:outline-none focus:ring-0 focus:border-primary"
-  />
-);
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const SignInPage = () => {
-  const [lang, setLang] = useState("EN");
   const navigate = useNavigate();
-
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // inside SignInPage.jsx
-const handleSubmit = async (e) => {
-  e?.preventDefault();
-  setErrorMsg("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
 
-  if (!emailOrPhone || !password) {
-    setErrorMsg("Please enter email / phone and password.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const res = await axios.post(`${API_BASE}/api/auth/login`, {
-      emailOrPhone,
-      password,
-    });
-
-    const { token, user } = res.data || {};
-
-    if (token) {
-      localStorage.setItem("authToken", token);
-    }
-    if (user) {
-      localStorage.setItem("currentUser", JSON.stringify(user));
+    if (!emailOrPhone || !password) {
+      setErrorMsg("Please enter your email / phone and password.");
+      return;
     }
 
-    console.log("LOGIN SUCCESS:", user);
+    try {
+      setLoading(true);
 
-    if (user?.role === "doctor") {
-      // doctor dashboard
-      navigate("/professional-dashboard-portal");
-    } else if (user?.role === "patient") {
-      // patient dashboard
+      const res = await axios.post(`${API_BASE}/api/auth/login`, {
+        emailOrPhone,
+        password,
+      });
+
+      const { token, user } = res.data || {};
+
+      if (token) localStorage.setItem("authToken", token);
+      if (user) localStorage.setItem("currentUser", JSON.stringify(user));
+
+      // Patient portal redirect
       navigate("/personal-wellness-hub");
-    } else {
-      navigate("/"); // fallback
+    } catch (err) {
+      console.error("USER SIGNIN ERROR:", err);
+      const msg =
+        err?.response?.data?.message ||
+        "Login failed. Please check your credentials.";
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("SIGNIN ERROR:", err);
-    const msg =
-      err?.response?.data?.message ||
-      "Login failed. Please check your email / phone and password.";
-    setErrorMsg(msg);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-  const isEnglish = lang === "EN";
-  const identifierPlaceholder = isEnglish
-    ? "EMAIL / PHONE NUMBER"
-    : "ईमेल / फोन नंबर";
-  const passwordPlaceholder = isEnglish ? "PASSWORD" : "पासवर्ड";
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background/60 py-12">
-      <div className="w-full px-4">
-        <div className="mx-auto max-w-xl">
-          <div className="bg-card rounded-2xl border-4 border-border p-6 sm:p-8 shadow-sm">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-4">
-              <BrandLogo />
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setLang("HI")}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-                    lang === "HI"
-                      ? "bg-brand-gold text-white"
-                      : "bg-white border border-border text-primary"
-                  }`}
-                >
-                  HINDI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLang("EN")}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-                    lang === "EN"
-                      ? "bg-white border-2 border-border text-primary"
-                      : "bg-white text-primary/80"
-                  }`}
-                >
-                  ENGLISH
-                </button>
-              </div>
+    <div className="min-h-screen bg-[#fdf7ee] bg-gradient-to-b from-[#fdf7ee] via-[#f6f0e5] to-[#f3ecdf] flex flex-col">
+      <div className="h-20" />
+
+      <main className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="max-w-5xl w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 items-center animate-fadeInUp">
+          {/* Left: marketing/intro */}
+          <div className="hidden md:block">
+            <p className="text-sm uppercase tracking-[0.2em] text-emerald-700/80 font-semibold mb-3">
+              For Users
+            </p>
+            <h1 className="text-3xl font-serif font-semibold text-[#1f2933] mb-4">
+              Welcome back to your
+              <span className="text-emerald-700"> wellness journey</span>.
+            </h1>
+            <p className="text-[#4b5563] text-base mb-4">
+              Continue where you left off with personalized diet plans,
+              progress tracking, and Ayurvedic insights tuned to your
+              unique constitution.
+            </p>
+            <ul className="text-sm text-[#374151] space-y-1">
+              <li>• Resume your daily nutrition insights</li>
+              <li>• Review personalized recommendations</li>
+              <li>• Stay connected with AyurNutri experts</li>
+            </ul>
+          </div>
+
+          {/* Right: form card */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-emerald-900/5 p-6 sm:p-8">
+            <div className="mb-6">
+              <p className="text-xs uppercase tracking-[0.18em] text-emerald-700/80 font-semibold mb-2">
+                Sign In
+              </p>
+              <h2 className="text-2xl font-semibold text-[#111827]">
+                User account
+              </h2>
+              <p className="text-sm text-[#6b7280] mt-1">
+                Use the email or phone number you registered with.
+              </p>
             </div>
 
-            {/* Tabs */}
-            <div className="flex items-center justify-center gap-4 mb-5">
-              <button
-                type="button"
-                className="px-5 py-2 rounded-full text-sm font-semibold bg-primary text-primary-foreground shadow"
-              >
-                LOGIN
-              </button>
-              <Link
-                to="/signup"
-                className="px-4 py-2 rounded-full text-sm font-semibold bg-white border-2 border-border text-text-secondary"
-              >
-                SIGNUP
-              </Link>
-            </div>
-
-            {/* Error message */}
             {errorMsg && (
-              <div className="mb-3 text-center text-xs sm:text-sm text-red-600 font-medium">
+              <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {errorMsg}
               </div>
             )}
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <AuthInput
-                name="emailOrPhone"
-                placeholder={identifierPlaceholder}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                label="Email or Phone"
+                required
                 value={emailOrPhone}
-                onChange={setEmailOrPhone}
-                autoComplete="username"
+                onChange={(e) => setEmailOrPhone(e.target.value)}
+                placeholder="you@example.com or 98xxxxxx"
               />
 
-              <AuthInput
-                name="password"
-                placeholder={passwordPlaceholder}
+              <Input
+                label="Password"
                 type="password"
+                required
                 value={password}
-                onChange={setPassword}
-                autoComplete="current-password"
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
               />
 
-              <div className="flex flex-col sm:flex-row items-center gap-3 justify-center mt-3">
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full sm:w-auto bg-primary text-primary-foreground px-6 py-2 disabled:opacity-60"
-                >
-                  {loading ? "LOGGING IN..." : "LOGIN"}
-                </Button>
-
+              <div className="flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-[#6b7280]">
+                  New here?{" "}
+                  <Link
+                    to="/signup"
+                    className="text-emerald-700 font-semibold hover:underline"
+                  >
+                    Create a user account
+                  </Link>
+                </span>
                 <Link
-                  to="/signup/doctor"
-                  className="w-full sm:w-auto flex items-center justify-center border-2 border-border px-4 py-2 rounded-md text-sm"
+                  to="/reset"
+                  className="text-emerald-700 font-semibold hover:underline"
                 >
-                  DOCTOR SIGNUP
+                  Forgot password?
                 </Link>
               </div>
 
-              <div className="text-center mt-2">
-                <Link to="/reset" className="text-primary text-sm font-medium">
-                  FORGOT PASSWORD?
-                </Link>
-              </div>
+              <Button
+                type="submit"
+                loading={loading}
+                fullWidth
+                size="lg"
+                className="mt-2 bg-[#0f766e] hover:bg-[#115e59] shadow-md shadow-emerald-700/30"
+              >
+                Sign In as User
+              </Button>
             </form>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
