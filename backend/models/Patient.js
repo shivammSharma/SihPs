@@ -33,6 +33,24 @@ const PatientSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    dietPlan: {
+      breakfast: {
+        type: [mongoose.Schema.Types.Mixed], // store raw food objects for now
+        default: [],
+      },
+      lunch: {
+        type: [mongoose.Schema.Types.Mixed],
+        default: [],
+      },
+      dinner: {
+        type: [mongoose.Schema.Types.Mixed],
+        default: [],
+      },
+      lastUpdated: {
+        type: Date,
+      },
+    },
+
   },
   {
     timestamps: true,

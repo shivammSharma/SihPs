@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
-import Icon from '../../../components/AppIcon';
-import useAuth from '../../../hooks/useAuth';
+// src/pages/professional-dashboard-portal/components/DashboardOverview.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import Icon from "../../../components/AppIcon";
+import useAuth from "../../../hooks/useAuth";
+
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const DashboardOverview = () => {
   const [patients, setPatients] = useState([]);
@@ -10,28 +14,49 @@ const DashboardOverview = () => {
 
   const { user } = useAuth();
 
+  // axios instance for this component
   const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '',
-    headers: { 'Content-Type': 'application/json' },
+    baseURL: API_BASE,
+    headers: { "Content-Type": "application/json" },
   });
 
   useEffect(() => {
     const fetchPatients = async () => {
       try {
         setLoading(true);
-        const res = await api.get('/api/patients');
+        setError(null);
+
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+          setError("Not authenticated. Please log in as a doctor.");
+          setPatients([]);
+          return;
+        }
+
+        const res = await api.get("/api/patients", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
         setPatients(res.data || []);
       } catch (err) {
-        console.error('Failed to load patients', err);
-        setError('Failed to load patients');
+        console.error("Failed to load patients", err);
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Failed to load patients";
+        setError(msg);
       } finally {
         setLoading(false);
       }
     };
 
     fetchPatients();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Helper: same-day comparison
   const isSameDay = (dateA, dateB) => {
     if (!dateA || !dateB) return false;
     const a = new Date(dateA);
@@ -59,41 +84,54 @@ const DashboardOverview = () => {
       const createdAt = p.createdAt ? new Date(p.createdAt) : null;
       const updatedAt = p.updatedAt ? new Date(p.updatedAt) : null;
 
+      // Today’s appointments
       if (p.nextAppointment && isSameDay(p.nextAppointment, now)) {
         stats.appointments += 1;
         const nextDate = new Date(p.nextAppointment);
+
         todays.push({
           id: p._id || p.id,
           patient: p.name,
           timeISO: p.nextAppointment,
           timeLabel: nextDate.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
+            hour: "2-digit",
+            minute: "2-digit",
           }),
-          type: p.type || 'Follow-up',
-          dosha: p.dosha || '',
-          condition: p.condition || '',
+          type: p.type || "Follow-up",
+          dosha: p.dosha || "",
+          condition: p.condition || "",
           nextAppointmentDate: nextDate,
         });
       }
 
-      if (String(p.status).toLowerCase() === 'followup') stats.pendingReviews += 1;
-      if (typeof p.progress === 'number' && p.progress < 30) stats.progressAlerts += 1;
+      // Pending reviews (you can adjust this rule)
+      if (String(p.status).toLowerCase() === "followup") {
+        stats.pendingReviews += 1;
+      }
 
+      // Progress alerts (low progress)
+      if (typeof p.progress === "number" && p.progress < 30) {
+        stats.progressAlerts += 1;
+      }
+
+      // New patients: status 'new' or created in last 7 days
       const daysSinceCreated = createdAt
         ? (now - createdAt) / (1000 * 60 * 60 * 24)
         : 999;
-      if (String(p.status).toLowerCase() === 'new' || daysSinceCreated <= 7)
-        stats.newPatients += 1;
 
+      if (String(p.status).toLowerCase() === "new" || daysSinceCreated <= 7) {
+        stats.newPatients += 1;
+      }
+
+      // Recent activity feed
       if (createdAt && now - createdAt <= 1000 * 60 * 60 * 24 * 7) {
         activities.push({
           id: `new-${p._id || p.id}`,
-          type: 'new',
+          type: "new",
           patient: p.name,
-          action: 'New patient registered',
+          action: "New patient registered",
           timeLabel: createdAt.toLocaleString(),
-          dosha: p.dosha || '',
+          dosha: p.dosha || "",
           when: createdAt,
         });
       } else if (
@@ -102,16 +140,17 @@ const DashboardOverview = () => {
       ) {
         activities.push({
           id: `upd-${p._id || p.id}`,
-          type: 'update',
+          type: "update",
           patient: p.name,
-          action: 'Profile updated',
+          action: "Profile updated",
           timeLabel: updatedAt.toLocaleString(),
-          dosha: p.dosha || '',
+          dosha: p.dosha || "",
           when: updatedAt,
         });
       }
     });
 
+    // Sort / trim results
     todays.sort((a, b) => a.nextAppointmentDate - b.nextAppointmentDate);
     activities.sort((a, b) => b.when - a.when);
     const recentTop = activities.slice(0, 5);
@@ -128,38 +167,38 @@ const DashboardOverview = () => {
       id: 1,
       title: "Today's Appointments",
       value: todayStats.appointments,
-      icon: 'Calendar',
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
+      icon: "Calendar",
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
       id: 2,
-      title: 'Pending Plan Reviews',
+      title: "Pending Plan Reviews",
       value: todayStats.pendingReviews,
-      icon: 'FileText',
-      color: 'text-warning',
-      bgColor: 'bg-warning/10',
+      icon: "FileText",
+      color: "text-warning",
+      bgColor: "bg-warning/10",
     },
     {
       id: 3,
-      title: 'Progress Alerts',
+      title: "Progress Alerts",
       value: todayStats.progressAlerts,
-      icon: 'TrendingUp',
-      color: 'text-success',
-      bgColor: 'bg-success/10',
+      icon: "TrendingUp",
+      color: "text-success",
+      bgColor: "bg-success/10",
     },
     {
       id: 4,
-      title: 'New Patients',
+      title: "New Patients",
       value: todayStats.newPatients,
-      icon: 'UserPlus',
-      color: 'text-secondary',
-      bgColor: 'bg-secondary/10',
+      icon: "UserPlus",
+      color: "text-secondary",
+      bgColor: "bg-secondary/10",
     },
   ];
 
   const getDoctorDisplayName = () => {
-    const baseName = user?.fullName || user?.name || 'Doctor';
+    const baseName = user?.fullName || user?.name || "Doctor";
     if (/^dr\.?/i.test(baseName.trim())) return baseName;
     return `Dr. ${baseName}`;
   };
@@ -177,7 +216,7 @@ const DashboardOverview = () => {
               Welcome back, {getDoctorDisplayName()}
             </h2>
             <p className="text-sm text-text-secondary">
-              <b>{loading ? 'Loading...' : todayStats.appointments}</b>{' '}
+              <b>{loading ? "Loading..." : todayStats.appointments}</b>{" "}
               appointments scheduled today.
             </p>
           </div>
@@ -217,7 +256,9 @@ const DashboardOverview = () => {
 
         <div className="p-4 space-y-3">
           {loading && (
-            <div className="p-3 text-text-secondary">Loading appointments…</div>
+            <div className="p-3 text-text-secondary">
+              Loading appointments…
+            </div>
           )}
 
           {!loading && todaysAppointments.length === 0 && (
@@ -250,14 +291,16 @@ const DashboardOverview = () => {
                 <p className="text-sm font-medium text-text-primary">
                   {appointment.timeLabel}
                 </p>
-                <p className="text-xs text-text-secondary">{appointment.type}</p>
+                <p className="text-xs text-text-secondary">
+                  {appointment.type}
+                </p>
               </div>
             </div>
           ))}
 
           <button
             className="w-full mt-3 p-2 text-sm text-primary hover:bg-primary/5 rounded-lg organic-transition"
-            onClick={() => console.log('View all appointments clicked')}
+            onClick={() => console.log("View all appointments clicked")}
           >
             View All Appointments
           </button>
@@ -296,14 +339,20 @@ const DashboardOverview = () => {
                 <p className="text-sm text-text-secondary">{act.action}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-text-secondary">{act.timeLabel}</p>
+                <p className="text-xs text-text-secondary">
+                  {act.timeLabel}
+                </p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {error && <div className="text-sm text-red-500">{error}</div>}
+      {error && (
+        <div className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+          {error}
+        </div>
+      )}
     </div>
   );
 };

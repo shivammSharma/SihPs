@@ -1,8 +1,7 @@
-// backend/routes/auth.js
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import Patient from "../models/patient.js";
+import AuthPatient from "../models/authPatient.js";
 import Doctor from "../models/doctor.js";
 
 const router = express.Router();
@@ -17,23 +16,24 @@ function createToken(id, role, email) {
   );
 }
 
-/* =========================
-   PATIENT SIGNUP
-   POST /api/auth/signup/patient
-   body: { fullName, email, password, phoneNumber, gender }
-   ========================= */
+/* ========= PATIENT SIGNUP ========= */
 router.post("/signup/patient", async (req, res) => {
   try {
-    const { fullName, email, password, phoneNumber, gender } = req.body;
+    let { fullName, email, password, phoneNumber, gender } = req.body || {};
 
     if (!fullName || !email || !password || !phoneNumber || !gender) {
-      return res
-        .status(400)
-        .json({ message: "fullName, email, password, phoneNumber and gender are required" });
+      return res.status(400).json({
+        message:
+          "fullName, email, password, phoneNumber and gender are required",
+      });
     }
 
-    // ensure unique email/phone among patients
-    const existing = await Patient.findOne({
+    fullName = String(fullName).trim();
+    email = String(email).trim().toLowerCase();
+    phoneNumber = String(phoneNumber).trim();
+    gender = String(gender).trim();
+
+    const existing = await AuthPatient.findOne({
       $or: [{ email }, { phoneNumber }],
     });
 
@@ -46,7 +46,7 @@ router.post("/signup/patient", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const patient = await Patient.create({
+    const patient = await AuthPatient.create({
       fullName,
       email,
       phoneNumber,
@@ -74,20 +74,21 @@ router.post("/signup/patient", async (req, res) => {
   }
 });
 
-/* =========================
-   DOCTOR SIGNUP
-   POST /api/auth/signup/doctor
-   body: { fullName, email, password, (optional phoneNumber, gender) }
-   ========================= */
+/* ========= DOCTOR SIGNUP ========= */
 router.post("/signup/doctor", async (req, res) => {
   try {
-    const { fullName, email, password, phoneNumber, gender } = req.body;
+    let { fullName, email, password, phoneNumber, gender } = req.body || {};
 
     if (!fullName || !email || !password) {
-      return res
-        .status(400)
-        .json({ message: "fullName, email and password are required" });
+      return res.status(400).json({
+        message: "fullName, email and password are required",
+      });
     }
+
+    fullName = String(fullName).trim();
+    email = String(email).trim().toLowerCase();
+    if (phoneNumber) phoneNumber = String(phoneNumber).trim();
+    if (gender) gender = String(gender).trim();
 
     const orConditions = [{ email }];
     if (phoneNumber) orConditions.push({ phoneNumber });
@@ -131,15 +132,10 @@ router.post("/signup/doctor", async (req, res) => {
   }
 });
 
-/* =========================
-   PATIENT LOGIN
-   POST /api/auth/login
-   body: { emailOrPhone, password }
-   used by your current SignInPage
-   ========================= */
+/* ========= PATIENT LOGIN ========= */
 router.post("/login", async (req, res) => {
   try {
-    const { emailOrPhone, password } = req.body;
+    let { emailOrPhone, password } = req.body || {};
 
     if (!emailOrPhone || !password) {
       return res
@@ -147,8 +143,13 @@ router.post("/login", async (req, res) => {
         .json({ message: "emailOrPhone and password are required" });
     }
 
-    const patient = await Patient.findOne({
-      $or: [{ email: emailOrPhone }, { phoneNumber: emailOrPhone }],
+    emailOrPhone = String(emailOrPhone).trim();
+
+    const patient = await AuthPatient.findOne({
+      $or: [
+        { email: emailOrPhone.toLowerCase() },
+        { phoneNumber: emailOrPhone },
+      ],
     });
 
     if (!patient) {
@@ -180,15 +181,10 @@ router.post("/login", async (req, res) => {
   }
 });
 
-/* =========================
-   DOCTOR LOGIN (optional)
-   POST /api/auth/login/doctor
-   body: { emailOrPhone, password }
-   for doctor portal if needed
-   ========================= */
+/* ========= DOCTOR LOGIN ========= */
 router.post("/login/doctor", async (req, res) => {
   try {
-    const { emailOrPhone, password } = req.body;
+    let { emailOrPhone, password } = req.body || {};
 
     if (!emailOrPhone || !password) {
       return res
@@ -196,8 +192,13 @@ router.post("/login/doctor", async (req, res) => {
         .json({ message: "emailOrPhone and password are required" });
     }
 
+    emailOrPhone = String(emailOrPhone).trim();
+
     const doctor = await Doctor.findOne({
-      $or: [{ email: emailOrPhone }, { phoneNumber: emailOrPhone }],
+      $or: [
+        { email: emailOrPhone.toLowerCase() },
+        { phoneNumber: emailOrPhone },
+      ],
     });
 
     if (!doctor) {
@@ -227,15 +228,6 @@ router.post("/login/doctor", async (req, res) => {
     console.error("Doctor login error:", err);
     return res.status(500).json({ message: "Server error" });
   }
-});
-
-// Forgot password placeholder
-router.post("/forgot", async (req, res) => {
-  const { email } = req.body;
-  console.log("Password reset requested for:", email);
-  return res.json({
-    message: "If this email exists, a reset link will be sent.",
-  });
 });
 
 export default router;

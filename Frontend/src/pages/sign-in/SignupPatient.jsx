@@ -1,10 +1,14 @@
+// src/pages/sign-in/SignupPatient.jsx (or your path)
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+// 👇 Use the same backend base as the rest of your app
+// Make sure VITE_API_BASE_URL is set to "http://localhost:9000" in your .env
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const SignupPatient = () => {
   const navigate = useNavigate();
@@ -21,6 +25,7 @@ const SignupPatient = () => {
     e.preventDefault();
     setErrorMsg("");
 
+    // basic validation
     if (!fullName || !email || !phoneNumber || !gender || !password) {
       setErrorMsg("Please fill all required fields.");
       return;
@@ -39,19 +44,25 @@ const SignupPatient = () => {
     try {
       setLoading(true);
 
+      // send to backend: /api/auth/signup/patient
       const res = await axios.post(`${API_BASE}/api/auth/signup/patient`, {
-        fullName,
-        email,
+        fullName: fullName.trim(),
+        email: email.trim(),
         password,
-        phoneNumber,
-        gender,
+        phoneNumber: phoneNumber.trim(),
+        gender: gender.trim(),
       });
 
       const { token, user } = res.data || {};
-      if (token) localStorage.setItem("authToken", token);
-      if (user) localStorage.setItem("currentUser", JSON.stringify(user));
 
-      // Directly send user to wellness hub
+      if (token) {
+        localStorage.setItem("authToken", token);
+      }
+      if (user) {
+        localStorage.setItem("currentUser", JSON.stringify(user));
+      }
+
+      // go to patient dashboard
       navigate("/personal-wellness-hub");
     } catch (err) {
       console.error("PATIENT SIGNUP ERROR:", err);
@@ -77,7 +88,10 @@ const SignupPatient = () => {
             </p>
             <h1 className="text-3xl font-serif font-semibold text-[#1f2933] mb-4">
               Begin your{" "}
-              <span className="text-emerald-700">Ayurvedic wellness journey</span>.
+              <span className="text-emerald-700">
+                Ayurvedic wellness journey
+              </span>
+              .
             </h1>
             <p className="text-[#4b5563] text-base mb-4">
               Create a free account to unlock personalized diet plans, guided

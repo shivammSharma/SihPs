@@ -1,4 +1,3 @@
-// backend/index.js
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
@@ -8,7 +7,9 @@ import { fileURLToPath } from "url";
 
 import patientsRouter from "./routes/patients.js";
 import authRouter from "./routes/auth.js";
-import subscriberRouter from "./routes/subscriber.js";  // ✅ NEW
+import patientPortalRouter from "./routes/patientPortal.js";
+import patientMeRouter from "./routes/patientMe.js";
+
 
 dotenv.config();
 
@@ -17,59 +18,30 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// ------------------------
-// Middlewares
-// ------------------------
 app.use(cors());
 app.use(express.json());
 
-// ------------------------
-// ROUTES
-// ------------------------
 app.use("/api/patients", patientsRouter);
 app.use("/api/auth", authRouter);
-app.use("/api", subscriberRouter);   // ✅ NEW (POST /api/subscribe)
+app.use("/api/patient", patientPortalRouter); 
+app.use("/api/patient", patientMeRouter);
 
-// ------------------------
-// HEALTH CHECK
-// ------------------------
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", time: new Date().toISOString() });
+  res.json({ status: "ok", ts: new Date().toISOString() });
 });
 
-// ------------------------
-// STATIC (Production build)
-// ------------------------
-if (process.env.NODE_ENV === "production") {
-  const clientPath = path.join(__dirname, "../client/dist");
-  app.use(express.static(clientPath));
-
-  app.get("*", (_, res) =>
-    res.sendFile(path.join(clientPath, "index.html"))
-  );
-}
-
-// ------------------------
-// DATABASE CONNECTION
-// ------------------------
 const PORT = process.env.PORT || 9000;
-const MONGO_URI = process.env.MONGO_URI;
-
-if (!MONGO_URI) {
-  console.error("❌ MONGO_URI missing in .env");
-  process.exit(1);
-}
+const MONGODB_URI =
+  process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ayurveda";
 
 mongoose
-  .connect(MONGO_URI, {
-    dbName: "patient_auth",
-  })
+  .connect(MONGODB_URI)
   .then(() => {
-    console.log("✅ Connected to MongoDB (patient_auth)");
+    console.log("Connected to MongoDB");
     app.listen(PORT, () =>
-      console.log(`🚀 Server running at http://localhost:${PORT}`)
+      console.log(`Server running on http://localhost:${PORT}`)
     );
   })
-  .catch((err) => console.error("❌ MongoDB Error:", err));
-
-export default app;
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });
