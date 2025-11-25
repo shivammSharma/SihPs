@@ -13,6 +13,10 @@ import Analytics from './components/Analytics';
 import Sessions from './components/Sessions';
 import Messages from './components/Messages';
 
+// NEW: Import quiz components
+import DoshaQuiz from './components/DoshaQuiz';
+import DoshaResult from './components/DoshaResult';
+
 const pageMotion = {
   initial: { opacity: 0, y: 10, scale: 0.995 },
   animate: { opacity: 1, y: 0, scale: 1 },
@@ -21,16 +25,20 @@ const pageMotion = {
 };
 
 const PersonalWellnessHub = () => {
-    const { user, isPatient } = useAuth();
+  const { user, isPatient } = useAuth();
 
-  // If somehow a doctor or unauthenticated user gets here:
+  // Security check
   if (!isPatient) {
     if (user?.role === "doctor") {
       return <Navigate to="/professional-dashboard-portal" replace />;
     }
     return <Navigate to="/signin" replace />;
   }
+
   const [active, setActive] = useState('dashboard');
+
+  // NEW: Quiz result state
+  const [quizResult, setQuizResult] = useState(null);
 
   const userData = {
     name: 'Priya Sharma',
@@ -52,14 +60,34 @@ const PersonalWellnessHub = () => {
             todaysRecommendations={todaysRecommendations}
           />
         );
+
       case 'food-scan':
         return <FoodScan />;
+
       case 'analytics':
         return <Analytics />;
+
       case 'sessions':
         return <Sessions />;
+
       case 'messages':
         return <Messages />;
+
+      // ⭐ NEW: Dosha Quiz screen
+      case 'dosha-quiz':
+        return (
+          <DoshaQuiz
+            onResult={(result) => {
+              setQuizResult(result);
+              setActive('dosha-result');
+            }}
+          />
+        );
+
+      // ⭐ NEW: Dosha Result screen
+      case 'dosha-result':
+        return <DoshaResult result={quizResult} />;
+
       default:
         return (
           <DashboardHome

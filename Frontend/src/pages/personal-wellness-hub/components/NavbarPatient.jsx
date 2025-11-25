@@ -15,6 +15,10 @@ const NavbarPatient = ({
     { id: "analytics", label: "Analytics" },
     { id: "sessions", label: "Sessions" },
     { id: "messages", label: "Messages" },
+    {
+      id: "dosha-quiz",
+      label: "Dosha Quiz",
+    },
   ];
 
   const handleLogout = () => {
