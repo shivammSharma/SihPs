@@ -46,6 +46,23 @@ const PatientSchema = new mongoose.Schema(
         type: [mongoose.Schema.Types.Mixed],
         default: [],
       },
+      clinicalReports: [
+      {
+        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+        doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
+
+        title: { type: String },          // e.g. "Initial Assessment", "Follow-up Week 2"
+        summary: { type: String },        // short summary shown in UI
+
+        diagnosis: { type: String },      // doctor's impression / Ayurvedic diagnosis
+        notes: { type: String },          // detailed notes (SOAP style, etc.)
+        testsRecommended: { type: String }, // lab tests / imaging etc.
+        plan: { type: String },           // diet + lifestyle + medication plan
+
+        followUpDate: { type: Date },     // when to come next
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
       lastUpdated: {
         type: Date,
       },

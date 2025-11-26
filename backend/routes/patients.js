@@ -295,4 +295,56 @@ router.post("/:id/diet-plan", verifyToken, requireDoctor, async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
+
+router.post("/:id/report", verifyToken, requireDoctor, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      summary,
+      diagnosis,
+      notes,
+      testsRecommended,
+      plan,
+      followUpDate,
+    } = req.body || {};
+
+    const patient = await Patient.findById(id);
+    if (!patient) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
+
+    // Optional guard: ensure this doctor owns the patient
+    if (patient.doctorId && patient.doctorId.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "You are not assigned to this patient" });
+    }
+
+    const report = {
+      doctorId: req.user.id,
+      title: title || "Clinical Note",
+      summary: summary || "",
+      diagnosis: diagnosis || "",
+      notes: notes || "",
+      testsRecommended: testsRecommended || "",
+      plan: plan || "",
+      followUpDate: followUpDate || null,
+      createdAt: new Date(),
+    };
+
+    patient.clinicalReports.push(report);
+    await patient.save();
+
+    return res.json({
+      message: "Report added",
+      patient, // updated patient incl. clinicalReports
+    });
+  } catch (err) {
+    console.error("Create report error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 export default router;

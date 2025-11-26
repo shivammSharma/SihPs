@@ -47,6 +47,13 @@ const PatientManagement = () => {
     chronicConditions: "",
     lifestyleNotes: "",
     dietPreferences: "",
+     reportTitle: "",
+  reportSummary: "",
+  reportDiagnosis: "",
+  reportNotes: "",
+  reportTestsRecommended: "",
+  reportPlan: "",
+  reportFollowUpDate: "",
   });
 
   const filterOptions = [
@@ -240,6 +247,7 @@ const PatientManagement = () => {
     }
   };
 
+
   const openDetails = (patient) => {
     setSelectedPatient(patient);
     setEditFields({
@@ -322,6 +330,71 @@ const PatientManagement = () => {
       alert(err.message || "Error updating patient");
     }
   };
+  const handleCreateReport = async () => {
+  if (!selectedPatient?._id) return;
+
+  try {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      alert("You must be logged in as a doctor.");
+      return;
+    }
+
+    const payload = {
+      title: editFields.reportTitle,
+      summary: editFields.reportSummary,
+      diagnosis: editFields.reportDiagnosis,
+      notes: editFields.reportNotes,
+      testsRecommended: editFields.reportTestsRecommended,
+      plan: editFields.reportPlan,
+      followUpDate: editFields.reportFollowUpDate || null,
+    };
+
+    const res = await fetch(
+      `${API_BASE}/api/patients/${selectedPatient._id}/report`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || err.error || "Failed to create report");
+    }
+
+    const data = await res.json();
+    const updated = data.patient;
+
+    // Update patient list + selected patient
+    setPatients((prev) =>
+      prev.map((p) => (p._id === updated._id ? updated : p))
+    );
+    setSelectedPatient(updated);
+
+    // Clear report form fields
+    setEditFields((prev) => ({
+      ...prev,
+      reportTitle: "",
+      reportSummary: "",
+      reportDiagnosis: "",
+      reportNotes: "",
+      reportTestsRecommended: "",
+      reportPlan: "",
+      reportFollowUpDate: "",
+    }));
+
+    alert("Report saved successfully.");
+  } catch (err) {
+    console.error("Create report error:", err);
+    alert(err.message || "Error creating report");
+  }
+};
+
 
   return (
     <div className="space-y-6">
@@ -775,6 +848,7 @@ const PatientManagement = () => {
                   />
                 </div>
               </div>
+               Health Profile
 
               <div>
                 <div className="font-medium text-text-primary mb-1">
