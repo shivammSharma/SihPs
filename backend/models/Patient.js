@@ -1,6 +1,26 @@
 // backend/models/patient.js
 import mongoose from "mongoose";
 
+// Subschema for clinical reports
+const clinicalReportSchema = new mongoose.Schema(
+  {
+    doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
+
+    title: { type: String, trim: true },          // e.g. "Initial Assessment"
+    summary: { type: String, trim: true },        // short summary shown in UI
+
+    diagnosis: { type: String, trim: true },      // doctor's impression / Dx
+    notes: { type: String, trim: true },          // detailed notes
+    testsRecommended: { type: String, trim: true }, // lab tests / imaging
+    plan: { type: String, trim: true },           // diet + lifestyle + meds
+
+    followUpDate: { type: Date },                 // when to come next
+  },
+  {
+    timestamps: true, // gives createdAt / updatedAt per report
+  }
+);
+
 const PatientSchema = new mongoose.Schema(
   {
     fullName: {
@@ -33,6 +53,8 @@ const PatientSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
+    // 🔹 Diet plan for this patient
     dietPlan: {
       breakfast: {
         type: [mongoose.Schema.Types.Mixed], // store raw food objects for now
@@ -46,35 +68,20 @@ const PatientSchema = new mongoose.Schema(
         type: [mongoose.Schema.Types.Mixed],
         default: [],
       },
-      clinicalReports: [
-      {
-        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-        doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
-
-        title: { type: String },          // e.g. "Initial Assessment", "Follow-up Week 2"
-        summary: { type: String },        // short summary shown in UI
-
-        diagnosis: { type: String },      // doctor's impression / Ayurvedic diagnosis
-        notes: { type: String },          // detailed notes (SOAP style, etc.)
-        testsRecommended: { type: String }, // lab tests / imaging etc.
-        plan: { type: String },           // diet + lifestyle + medication plan
-
-        followUpDate: { type: Date },     // when to come next
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
       lastUpdated: {
         type: Date,
       },
     },
 
+    // 🔹 Clinical reports & doctor notes (ROOT LEVEL, not inside dietPlan)
+    clinicalReports: [clinicalReportSchema],
   },
   {
     timestamps: true,
   }
 );
 
-// ⬇ THIS LINE IS THE IMPORTANT CHANGE
+// Avoid OverwriteModelError in dev / hot reload
 const Patient =
   mongoose.models.Patient || mongoose.model("Patient", PatientSchema);
 

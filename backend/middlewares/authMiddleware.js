@@ -20,3 +20,11 @@ export function verifyToken(req, res, next) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 }
+
+export function requireDoctor(req, res, next) {
+  if (!req.user || req.user.role !== "doctor") {
+    return res.status(403).json({ message: "Doctor access required" });
+  }
+  next();
+}
+

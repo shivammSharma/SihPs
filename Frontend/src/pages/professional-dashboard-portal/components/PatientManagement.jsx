@@ -1,16 +1,16 @@
 // src/pages/.../PatientManagement.jsx
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";  
+import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
-
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const PatientManagement = () => {
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [selectedDosha, setSelectedDosha] = useState("all");
@@ -30,7 +30,7 @@ const PatientManagement = () => {
 
   const [errorMsg, setErrorMsg] = useState("");
 
-  // for details/edit drawer
+  // details/edit drawer
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [editFields, setEditFields] = useState({
@@ -47,13 +47,15 @@ const PatientManagement = () => {
     chronicConditions: "",
     lifestyleNotes: "",
     dietPreferences: "",
-     reportTitle: "",
-  reportSummary: "",
-  reportDiagnosis: "",
-  reportNotes: "",
-  reportTestsRecommended: "",
-  reportPlan: "",
-  reportFollowUpDate: "",
+
+    // clinical report fields
+    reportTitle: "",
+    reportSummary: "",
+    reportDiagnosis: "",
+    reportNotes: "",
+    reportTestsRecommended: "",
+    reportPlan: "",
+    reportFollowUpDate: "",
   });
 
   const filterOptions = [
@@ -193,9 +195,7 @@ const PatientManagement = () => {
       }
 
       if (!newPatient.patientIdentifier) {
-        alert(
-          "Please enter the patient's registered email or phone number."
-        );
+        alert("Please enter the patient's registered email or phone number.");
         return;
       }
 
@@ -247,10 +247,10 @@ const PatientManagement = () => {
     }
   };
 
-
   const openDetails = (patient) => {
     setSelectedPatient(patient);
-    setEditFields({
+    setEditFields((prev) => ({
+      ...prev,
       condition: patient?.condition || "",
       status: patient?.status || "new",
       nextAppointment: formatDateTimeLocal(patient?.nextAppointment),
@@ -265,7 +265,8 @@ const PatientManagement = () => {
       chronicConditions: patient?.chronicConditions || "",
       lifestyleNotes: patient?.lifestyleNotes || "",
       dietPreferences: patient?.dietPreferences || "",
-    });
+      // report fields stay as they were (empty unless doctor typed)
+    }));
     setShowDetails(true);
   };
 
@@ -330,71 +331,71 @@ const PatientManagement = () => {
       alert(err.message || "Error updating patient");
     }
   };
+
   const handleCreateReport = async () => {
-  if (!selectedPatient?._id) return;
+    if (!selectedPatient?._id) return;
 
-  try {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      alert("You must be logged in as a doctor.");
-      return;
-    }
-
-    const payload = {
-      title: editFields.reportTitle,
-      summary: editFields.reportSummary,
-      diagnosis: editFields.reportDiagnosis,
-      notes: editFields.reportNotes,
-      testsRecommended: editFields.reportTestsRecommended,
-      plan: editFields.reportPlan,
-      followUpDate: editFields.reportFollowUpDate || null,
-    };
-
-    const res = await fetch(
-      `${API_BASE}/api/patients/${selectedPatient._id}/report`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("You must be logged in as a doctor.");
+        return;
       }
-    );
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || err.error || "Failed to create report");
+      const payload = {
+        title: editFields.reportTitle,
+        summary: editFields.reportSummary,
+        diagnosis: editFields.reportDiagnosis,
+        notes: editFields.reportNotes,
+        testsRecommended: editFields.reportTestsRecommended,
+        plan: editFields.reportPlan,
+        followUpDate: editFields.reportFollowUpDate || null,
+      };
+
+      const res = await fetch(
+        `${API_BASE}/api/patients/${selectedPatient._id}/report`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          err.message || err.error || "Failed to create report"
+        );
+      }
+
+      const data = await res.json();
+      const updated = data.patient;
+
+      setPatients((prev) =>
+        prev.map((p) => (p._id === updated._id ? updated : p))
+      );
+      setSelectedPatient(updated);
+
+      setEditFields((prev) => ({
+        ...prev,
+        reportTitle: "",
+        reportSummary: "",
+        reportDiagnosis: "",
+        reportNotes: "",
+        reportTestsRecommended: "",
+        reportPlan: "",
+        reportFollowUpDate: "",
+      }));
+
+      alert("Report saved successfully.");
+    } catch (err) {
+      console.error("Create report error:", err);
+      alert(err.message || "Error creating report");
     }
-
-    const data = await res.json();
-    const updated = data.patient;
-
-    // Update patient list + selected patient
-    setPatients((prev) =>
-      prev.map((p) => (p._id === updated._id ? updated : p))
-    );
-    setSelectedPatient(updated);
-
-    // Clear report form fields
-    setEditFields((prev) => ({
-      ...prev,
-      reportTitle: "",
-      reportSummary: "",
-      reportDiagnosis: "",
-      reportNotes: "",
-      reportTestsRecommended: "",
-      reportPlan: "",
-      reportFollowUpDate: "",
-    }));
-
-    alert("Report saved successfully.");
-  } catch (err) {
-    console.error("Create report error:", err);
-    alert(err.message || "Error creating report");
-  }
-};
-
+  };
 
   return (
     <div className="space-y-6">
@@ -438,7 +439,7 @@ const PatientManagement = () => {
         </div>
       </div>
 
-      {/* Error (only when no data) */}
+      {/* Error */}
       {errorMsg && patients.length === 0 && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
           {errorMsg}
@@ -484,7 +485,6 @@ const PatientManagement = () => {
                     {patient?.condition}
                   </p>
 
-                  {/* linked account info */}
                   {patient?.patientAccountId && (
                     <p className="text-xs text-text-secondary mt-1">
                       Account:{" "}
@@ -699,10 +699,7 @@ const PatientManagement = () => {
                     value={editFields.heightCm}
                     onChange={(e) => {
                       const heightCm = e.target.value;
-                      const bmi = recalcBmi(
-                        heightCm,
-                        editFields.weightKg
-                      );
+                      const bmi = recalcBmi(heightCm, editFields.weightKg);
                       setEditFields((prev) => ({
                         ...prev,
                         heightCm,
@@ -716,10 +713,7 @@ const PatientManagement = () => {
                     value={editFields.weightKg}
                     onChange={(e) => {
                       const weightKg = e.target.value;
-                      const bmi = recalcBmi(
-                        editFields.heightCm,
-                        weightKg
-                      );
+                      const bmi = recalcBmi(editFields.heightCm, weightKg);
                       setEditFields((prev) => ({
                         ...prev,
                         weightKg,
@@ -848,8 +842,172 @@ const PatientManagement = () => {
                   />
                 </div>
               </div>
-               Health Profile
 
+              {/* Clinical Reports */}
+              <div className="mt-6 border-t border-border pt-4">
+                <div className="font-medium text-text-primary mb-2">
+                  Clinical Reports & Doctor Notes
+                </div>
+
+                {/* Existing reports list */}
+                <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                  {(selectedPatient?.clinicalReports || []).length === 0 && (
+                    <p className="text-xs text-text-secondary">
+                      No reports created yet for this patient.
+                    </p>
+                  )}
+
+                  {(selectedPatient?.clinicalReports || [])
+                    .slice()
+                    .reverse()
+                    .map((rep, idx) => (
+                      <div
+                        key={rep._id || idx}
+                        className="border border-border rounded-md p-2 bg-muted/20"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="text-sm font-semibold text-text-primary">
+                            {rep.title || "Clinical Note"}
+                          </div>
+                          <div className="text-[10px] text-text-secondary">
+                            {rep.createdAt
+                              ? new Date(rep.createdAt).toLocaleString([], {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                })
+                              : ""}
+                          </div>
+                        </div>
+                        {rep.summary && (
+                          <div className="text-xs text-text-secondary mb-1">
+                            {rep.summary}
+                          </div>
+                        )}
+                        {rep.diagnosis && (
+                          <div className="text-[11px] text-text-secondary">
+                            <span className="font-semibold">Dx: </span>
+                            {rep.diagnosis}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+
+                {/* New report form */}
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Report title (e.g. Initial Assessment)"
+                    value={editFields.reportTitle}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        reportTitle: e.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    placeholder="Short summary"
+                    value={editFields.reportSummary}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        reportSummary: e.target.value,
+                      }))
+                    }
+                  />
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Diagnosis / Clinical Impression
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={2}
+                      value={editFields.reportDiagnosis}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          reportDiagnosis: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Detailed Notes
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={3}
+                      value={editFields.reportNotes}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          reportNotes: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Tests / Investigations Recommended
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={2}
+                      value={editFields.reportTestsRecommended}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          reportTestsRecommended: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Plan / Recommendations
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={3}
+                      value={editFields.reportPlan}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          reportPlan: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Follow-up Date (optional)
+                    </div>
+                    <Input
+                      type="date"
+                      value={editFields.reportFollowUpDate}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          reportFollowUpDate: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleCreateReport}
+                    >
+                      Save Clinical Report
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Next Appointment */}
               <div>
                 <div className="font-medium text-text-primary mb-1">
                   Next Appointment
@@ -867,30 +1025,31 @@ const PatientManagement = () => {
               </div>
 
               {/* Diet Plan Builder */}
-<div className="mt-6 border-t border-border pt-4">
-  <div className="font-medium text-text-primary mb-2">
-    Diet Plan
-  </div>
-  <p className="text-xs text-text-secondary mb-3">
-    Open the full-screen diet planner to design or edit this patient&apos;s meal plan.
-  </p>
+              <div className="mt-6 border-t border-border pt-4">
+                <div className="font-medium text-text-primary mb-2">
+                  Diet Plan
+                </div>
+                <p className="text-xs text-text-secondary mb-3">
+                  Open the full-screen diet planner to design or edit this patient&apos;s meal
+                  plan.
+                </p>
 
-  <Button
-    variant="default"
-    className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
-    onClick={() => {
-      navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
-        state: {
-          patientName: selectedPatient.name,
-        },
-      });
-    }}
-  >
-    Open Diet Planner
-  </Button>
-</div>
+                <Button
+                  variant="default"
+                  className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
+                  onClick={() => {
+                    navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
+                      state: {
+                        patientName: selectedPatient.name,
+                      },
+                    });
+                  }}
+                >
+                  Open Diet Planner
+                </Button>
+              </div>
 
-
+              {/* Save */}
               <div className="pt-4 flex justify-end">
                 <Button variant="default" onClick={handleUpdatePatient}>
                   Save Changes

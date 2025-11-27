@@ -1,11 +1,14 @@
+// backend/routes/patients.js
 import express from "express";
 import ClinicalPatient from "../models/ClinicalPatient.js";
 import AuthPatient from "../models/authPatient.js";
-import Patient from "../models/Patient.js";
 import { verifyToken } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
+/**
+ * Middleware: only allow doctor role
+ */
 function requireDoctor(req, res, next) {
   if (req.user?.role !== "doctor") {
     return res.status(403).json({ message: "Doctor access required" });
@@ -17,18 +20,12 @@ function requireDoctor(req, res, next) {
  * GET /api/patients
  * Doctor sees only their own patients
  */
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", verifyToken, requireDoctor, async (req, res) => {
   try {
-    const { id, role } = req.user;
-
-    if (role !== "doctor") {
-      return res
-        .status(403)
-        .json({ message: "Only doctors can view patients" });
-    }
-
+    const doctorId = req.user.id;
     const { status, dosha, q } = req.query;
-    const filter = { doctorId: id };
+
+    const filter = { doctorId };
 
     if (status && status !== "all") filter.status = status;
     if (dosha && dosha !== "all") filter.dosha = new RegExp(dosha, "i");
@@ -47,48 +44,39 @@ router.get("/", verifyToken, async (req, res) => {
 
 /**
  * POST /api/patients
- * Doctor creates a patient linked to themselves
- * BUT ONLY if the patient has an account already
+ * Doctor creates a clinical-patient record linked to themselves
+ * BUT ONLY if the patient has an auth account already
  */
-router.post("/", verifyToken, async (req, res) => {
+router.post("/", verifyToken, requireDoctor, async (req, res) => {
   try {
-    const { id, role } = req.user;
-
-    if (role !== "doctor") {
-      return res
-        .status(403)
-        .json({ message: "Only doctors can create patients" });
-    }
+    const doctorId = req.user.id;
 
     const {
-  // name (we’re using authPatient.fullName)
-  age,
-  dosha,
-  condition,
-  status,
-  lastVisit,
-  nextAppointment,
-  progress,
-  patientIdentifier,
+      age,
+      dosha,
+      condition,
+      status,
+      lastVisit,
+      nextAppointment,
+      progress,
+      patientIdentifier,
 
-  // 🔽 NEW health profile fields
-  heightCm,
-  weightKg,
-  bmi,
-  bloodPressure,
-  heartRate,
-  allergies,
-  medications,
-  chronicConditions,
-  lifestyleNotes,
-  dietPreferences,
-} = req.body;
+      // health profile fields
+      heightCm,
+      weightKg,
+      bmi,
+      bloodPressure,
+      heartRate,
+      allergies,
+      medications,
+      chronicConditions,
+      lifestyleNotes,
+      dietPreferences,
+    } = req.body;
 
-
-if (!condition) {
-  return res.status(400).json({ error: "Condition is required" });
-}
-
+    if (!condition) {
+      return res.status(400).json({ error: "Condition is required" });
+    }
 
     if (!patientIdentifier) {
       return res.status(400).json({
@@ -114,30 +102,30 @@ if (!condition) {
     }
 
     const patient = new ClinicalPatient({
-  name: authPatient.fullName, // from account
-  age,
-  dosha,
-  condition,
-  status: status || "new",
-  lastVisit: lastVisit ? new Date(lastVisit) : null,
-  nextAppointment: nextAppointment ? new Date(nextAppointment) : null,
-  progress: progress ?? 0,
-  doctorId: id,
-  patientAccountId: authPatient._id,
+      // from account
+      name: authPatient.fullName,
+      age,
+      dosha,
+      condition,
+      status: status || "new",
+      lastVisit: lastVisit ? new Date(lastVisit) : null,
+      nextAppointment: nextAppointment ? new Date(nextAppointment) : null,
+      progress: progress ?? 0,
 
-  heightCm,
-  weightKg,
-  bmi,
-  bloodPressure,
-  heartRate,
-  allergies,
-  medications,
-  chronicConditions,
-  lifestyleNotes,
-  dietPreferences,
-});
+      doctorId,
+      patientAccountId: authPatient._id,
 
-
+      heightCm,
+      weightKg,
+      bmi,
+      bloodPressure,
+      heartRate,
+      allergies,
+      medications,
+      chronicConditions,
+      lifestyleNotes,
+      dietPreferences,
+    });
 
     const saved = await patient.save();
     res.status(201).json(saved);
@@ -149,22 +137,16 @@ if (!condition) {
 
 /**
  * PUT /api/patients/:id
- * Doctor can only update their own patient
+ * Doctor can only update their own clinical-patient
  */
-router.put("/:id", verifyToken, async (req, res) => {
+router.put("/:id", verifyToken, requireDoctor, async (req, res) => {
   try {
-    const { id, role } = req.user;
-
-    if (role !== "doctor") {
-      return res
-        .status(403)
-        .json({ message: "Only doctors can update patients" });
-    }
-
+    const doctorId = req.user.id;
+    const clinicalPatientId = req.params.id;
     const updates = req.body;
 
     const patient = await ClinicalPatient.findOneAndUpdate(
-      { _id: req.params.id, doctorId: id },
+      { _id: clinicalPatientId, doctorId },
       updates,
       { new: true }
     ).populate("patientAccountId", "fullName email phoneNumber");
@@ -185,19 +167,14 @@ router.put("/:id", verifyToken, async (req, res) => {
 /**
  * DELETE /api/patients/:id
  */
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", verifyToken, requireDoctor, async (req, res) => {
   try {
-    const { id, role } = req.user;
-
-    if (role !== "doctor") {
-      return res
-        .status(403)
-        .json({ message: "Only doctors can delete patients" });
-    }
+    const doctorId = req.user.id;
+    const clinicalPatientId = req.params.id;
 
     const patient = await ClinicalPatient.findOneAndDelete({
-      _id: req.params.id,
-      doctorId: id,
+      _id: clinicalPatientId,
+      doctorId,
     });
 
     if (!patient) {
@@ -206,99 +183,64 @@ router.delete("/:id", verifyToken, async (req, res) => {
         .json({ error: "Patient not found or not your patient" });
     }
 
-    res.json({ message: "Deleted", id: req.params.id });
+    res.json({ message: "Deleted", id: clinicalPatientId });
   } catch (err) {
     console.error("DELETE /api/patients/:id error:", err);
     res.status(500).json({ error: err.message || "Server error" });
   }
 });
-router.post(
-  "/:id/diet-plan",
-  verifyToken,
-  async (req, res) => {
-    try {
-      const { id: doctorId, role } = req.user;
-      if (role !== "doctor") {
-        return res
-          .status(403)
-          .json({ message: "Only doctors can assign diet plans" });
-      }
 
-      const { breakfast = [], lunch = [], dinner = [] } = req.body;
-
-      const patient = await ClinicalPatient.findOneAndUpdate(
-        { _id: req.params.id, doctorId }, // ensure doctor owns this patient
-        {
-          $set: {
-            dietPlan: {
-              breakfast,
-              lunch,
-              dinner,
-              updatedAt: new Date(),
-            },
-          },
-        },
-        { new: true }
-      );
-
-      if (!patient) {
-        return res
-          .status(404)
-          .json({ message: "Patient not found for this doctor" });
-      }
-
-      return res.json({
-        message: "Diet plan updated",
-        patient,
-      });
-    } catch (err) {
-      console.error("POST /api/patients/:id/diet-plan error:", err);
-      return res
-        .status(500)
-        .json({ message: err.message || "Server error" });
-    }
-  }
-);
-//save diet plan
+/**
+ * POST /api/patients/:id/diet-plan
+ * Save diet plan on the CLINICAL patient (per doctor)
+ */
 router.post("/:id/diet-plan", verifyToken, requireDoctor, async (req, res) => {
   try {
-    const { id } = req.params;
+    const doctorId = req.user.id;
+    const clinicalPatientId = req.params.id;
     const { breakfast = [], lunch = [], dinner = [] } = req.body || {};
 
-    const patient = await Patient.findById(id);
+    const patient = await ClinicalPatient.findOneAndUpdate(
+      { _id: clinicalPatientId, doctorId }, // make sure doctor owns this patient
+      {
+        $set: {
+          dietPlan: {
+            breakfast,
+            lunch,
+            dinner,
+            updatedAt: new Date(),
+          },
+        },
+      },
+      { new: true }
+    ).populate("patientAccountId", "fullName email phoneNumber");
+
     if (!patient) {
-      return res.status(404).json({ message: "Patient not found" });
-    }
-
-    // optionally ensure this doctor owns this patient
-    if (patient.doctorId && patient.doctorId.toString() !== req.user.id) {
       return res
-        .status(403)
-        .json({ message: "You are not assigned to this patient" });
+        .status(404)
+        .json({ message: "Patient not found for this doctor" });
     }
-
-    patient.dietPlan = {
-      breakfast,
-      lunch,
-      dinner,
-      lastUpdated: new Date(),
-    };
-
-    await patient.save();
 
     return res.json({
-      message: "Diet plan saved",
+      message: "Diet plan updated",
       patient,
     });
   } catch (err) {
-    console.error("Save diet plan error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.error("POST /api/patients/:id/diet-plan error:", err);
+    return res
+      .status(500)
+      .json({ message: err.message || "Server error" });
   }
 });
 
+/**
+ * POST /api/patients/:id/report
+ * Add clinical report / doctor notes on CLINICAL patient
+ */
 router.post("/:id/report", verifyToken, requireDoctor, async (req, res) => {
   try {
-    const { id } = req.params;
+    const doctorId = req.user.id;
+    const clinicalPatientId = req.params.id;
     const {
       title,
       summary,
@@ -309,42 +251,41 @@ router.post("/:id/report", verifyToken, requireDoctor, async (req, res) => {
       followUpDate,
     } = req.body || {};
 
-    const patient = await Patient.findById(id);
-    if (!patient) {
-      return res.status(404).json({ message: "Patient not found" });
-    }
+    const patient = await ClinicalPatient.findOne({
+      _id: clinicalPatientId,
+      doctorId, // ensure this doctor owns the patient
+    });
 
-    // Optional guard: ensure this doctor owns the patient
-    if (patient.doctorId && patient.doctorId.toString() !== req.user.id) {
+    if (!patient) {
       return res
-        .status(403)
-        .json({ message: "You are not assigned to this patient" });
+        .status(404)
+        .json({ message: "Patient not found or not your patient" });
     }
 
     const report = {
-      doctorId: req.user.id,
+      doctorId,
       title: title || "Clinical Note",
       summary: summary || "",
       diagnosis: diagnosis || "",
       notes: notes || "",
       testsRecommended: testsRecommended || "",
       plan: plan || "",
-      followUpDate: followUpDate || null,
+      followUpDate: followUpDate ? new Date(followUpDate) : null,
       createdAt: new Date(),
     };
 
+    // `clinicalReports` is defined in ClinicalPatientSchema
     patient.clinicalReports.push(report);
     await patient.save();
 
     return res.json({
       message: "Report added",
-      patient, // updated patient incl. clinicalReports
+      patient,
     });
   } catch (err) {
     console.error("Create report error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
-
 
 export default router;
