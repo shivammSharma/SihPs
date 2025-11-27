@@ -26,6 +26,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/patient", patientPortalRouter); 
 app.use("/api/patient", patientMeRouter);
 
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", ts: new Date().toISOString() });
 });
