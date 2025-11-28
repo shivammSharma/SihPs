@@ -218,15 +218,7 @@ const FoodScanResult = () => {
         >
           Scan Another
         </button>
-        <button
-          onClick={() => {
-            // example: save analysis to user history via API (hook up later)
-            alert("Save feature not implemented yet — will call backend to save record.");
-          }}
-          className="px-4 py-2 rounded bg-[var(--ayur-primary)] text-white"
-        >
-          Save Analysis
-        </button>
+  
       </div>
     </motion.section>
   );

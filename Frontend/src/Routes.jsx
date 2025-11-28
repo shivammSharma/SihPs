@@ -23,6 +23,9 @@ import ResetPassword from "./pages/sign-in/ResetPassword";
 // Diet builder (doctor)
 import DoctorDietBuilderPage from "./pages/professional-dashboard-portal/components/DoctorDietBuilderPage.jsx";
 
+import FoodScan from "./pages/personal-wellness-hub/components/FoodScan";
+import FoodScanResult from "./pages/personal-wellness-hub/components/FoodScanResult";
+
 const AppRoutes = () => {
   return (
     <BrowserRouter>
@@ -74,6 +77,16 @@ const AppRoutes = () => {
 
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />
+
+          <Route
+          path="/personal-wellness-hub/food-scan"
+          element={<FoodScan />}
+        />
+        <Route
+          path="/personal-wellness-hub/food-scan/result"
+          element={<FoodScanResult />}
+        />
+
         </Routes>
       </ErrorBoundary>
     </BrowserRouter>

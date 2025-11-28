@@ -9,9 +9,12 @@ import patientsRouter from "./routes/patients.js";
 import authRouter from "./routes/auth.js";
 import patientPortalRouter from "./routes/patientPortal.js";
 import patientMeRouter from "./routes/patientMe.js";
+import foodScanRoutes from "./routes/foodScanRoutes.js";
 
 
 dotenv.config();
+console.log("ENV KEY:", process.env.GEMINI_API_KEY);
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +28,7 @@ app.use("/api/patients", patientsRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/patient", patientPortalRouter); 
 app.use("/api/patient", patientMeRouter);
+app.use("/api/food-scan", foodScanRoutes);
 
 
 app.get("/api/health", (req, res) => {
