@@ -30,7 +30,7 @@ const PatientManagement = () => {
 
   const [errorMsg, setErrorMsg] = useState("");
 
-  // details/edit drawer
+  // details/edit modal
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [editFields, setEditFields] = useState({
@@ -609,59 +609,97 @@ const PatientManagement = () => {
         </div>
       )}
 
-      {/* Details / Edit Drawer */}
+      {/* Centered Details / Edit Modal */}
       {showDetails && selectedPatient && (
-        <div className="fixed inset-0 flex justify-end bg-black/30 z-50">
-          <div className="w-full max-w-md h-full bg-white shadow-xl p-6 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">
-                {selectedPatient.name}
-              </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDetails(false)}
-              >
-                Close
-              </Button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-3xl max-h-[80vh] bg-white rounded-2xl shadow-2xl border border-border flex flex-col animate-[modalScaleIn_0.25s_ease-out]">
+            {/* Profile Header Card */}
+            <div className="px-6 pt-5 pb-4 border-b bg-gradient-to-r from-emerald-50 to-emerald-100/40">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-green-700 text-white flex items-center justify-center font-semibold">
+                    {selectedPatient?.name?.[0]?.toUpperCase() || "P"}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-primary capitalize">
+                      {selectedPatient.name}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                      <span className="text-text-secondary">
+                        {selectedPatient.age || "-"}y
+                      </span>
+                      {selectedPatient.dosha && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full ${getDoshaColor(
+                            selectedPatient.dosha
+                          )}`}
+                        >
+                          {selectedPatient.dosha}
+                        </span>
+                      )}
+                      <span
+                        className={`px-2 py-0.5 rounded-full ${getStatusColor(
+                          editFields.status || selectedPatient.status
+                        )}`}
+                      >
+                        {getStatusLabel(
+                          editFields.status || selectedPatient.status
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDetails(false)}
+                >
+                  Close
+                </Button>
+              </div>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div>
-                <div className="font-medium text-text-primary">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 text-sm">
+              {/* Basic Info */}
+              <section>
+                <h4 className="text-sm font-semibold text-text-primary mb-2">
                   Basic Info
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-text-secondary">
+                  <div>Age: {selectedPatient.age || "-"}</div>
+                  <div>Dosha: {selectedPatient.dosha || "-"}</div>
                 </div>
-                <div className="text-text-secondary">
-                  Age: {selectedPatient.age || "-"}
-                </div>
-                <div className="text-text-secondary">
-                  Dosha: {selectedPatient.dosha || "-"}
-                </div>
-              </div>
+              </section>
 
+              {/* Account */}
               {selectedPatient.patientAccountId && (
-                <div>
-                  <div className="font-medium text-text-primary">
+                <section>
+                  <h4 className="text-sm font-semibold text-text-primary mb-2">
                     Account
+                  </h4>
+                  <div className="space-y-1 text-text-secondary">
+                    <div>
+                      Name: {selectedPatient.patientAccountId.fullName}
+                    </div>
+                    <div>
+                      Email: {selectedPatient.patientAccountId.email}
+                    </div>
+                    <div>
+                      Phone: {selectedPatient.patientAccountId.phoneNumber}
+                    </div>
                   </div>
-                  <div className="text-text-secondary">
-                    Name: {selectedPatient.patientAccountId.fullName}
-                  </div>
-                  <div className="text-text-secondary">
-                    Email: {selectedPatient.patientAccountId.email}
-                  </div>
-                  <div className="text-text-secondary">
-                    Phone: {selectedPatient.patientAccountId.phoneNumber}
-                  </div>
-                </div>
+                </section>
               )}
 
-              <div>
-                <div className="font-medium text-text-primary mb-1">
+              {/* Condition */}
+              <section>
+                <h4 className="text-sm font-semibold text-text-primary mb-2">
                   Condition
-                </div>
+                </h4>
                 <textarea
-                  className="w-full border border-border rounded-md p-2 text-sm"
+                  className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30"
                   rows={3}
                   value={editFields.condition}
                   onChange={(e) =>
@@ -671,12 +709,13 @@ const PatientManagement = () => {
                     })
                   }
                 />
-              </div>
+              </section>
 
-              <div>
-                <div className="font-medium text-text-primary mb-1">
+              {/* Status */}
+              <section>
+                <h4 className="text-sm font-semibold text-text-primary mb-2">
                   Status
-                </div>
+                </h4>
                 <Select
                   options={filterOptions.filter((o) => o.value !== "all")}
                   value={editFields.status}
@@ -684,13 +723,13 @@ const PatientManagement = () => {
                     setEditFields({ ...editFields, status: val })
                   }
                 />
-              </div>
+              </section>
 
               {/* Health Profile */}
-              <div>
-                <div className="font-medium text-text-primary mb-1">
+              <section>
+                <h4 className="text-sm font-semibold text-text-primary mb-2">
                   Health Profile
-                </div>
+                </h4>
 
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <Input
@@ -773,84 +812,39 @@ const PatientManagement = () => {
                   />
                 </div>
 
-                <div className="mb-3">
-                  <div className="text-xs font-medium text-text-secondary mb-1">
-                    Allergies
+                {[
+                  ["Allergies", "allergies"],
+                  ["Medications", "medications"],
+                  ["Chronic Conditions", "chronicConditions"],
+                  ["Lifestyle Notes", "lifestyleNotes"],
+                ].map(([label, key]) => (
+                  <div className="mb-3" key={key}>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      {label}
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={key === "lifestyleNotes" ? 3 : 2}
+                      value={editFields[key]}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
+                    />
                   </div>
-                  <textarea
-                    className="w-full border border-border rounded-md p-2 text-sm"
-                    rows={2}
-                    value={editFields.allergies}
-                    onChange={(e) =>
-                      setEditFields((prev) => ({
-                        ...prev,
-                        allergies: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <div className="text-xs font-medium text-text-secondary mb-1">
-                    Medications
-                  </div>
-                  <textarea
-                    className="w-full border border-border rounded-md p-2 text-sm"
-                    rows={2}
-                    value={editFields.medications}
-                    onChange={(e) =>
-                      setEditFields((prev) => ({
-                        ...prev,
-                        medications: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <div className="text-xs font-medium text-text-secondary mb-1">
-                    Chronic Conditions
-                  </div>
-                  <textarea
-                    className="w-full border border-border rounded-md p-2 text-sm"
-                    rows={2}
-                    value={editFields.chronicConditions}
-                    onChange={(e) =>
-                      setEditFields((prev) => ({
-                        ...prev,
-                        chronicConditions: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <div className="text-xs font-medium text-text-secondary mb-1">
-                    Lifestyle Notes
-                  </div>
-                  <textarea
-                    className="w-full border border-border rounded-md p-2 text-sm"
-                    rows={3}
-                    placeholder="Sleep pattern, stress level, work type, exercise, etc."
-                    value={editFields.lifestyleNotes}
-                    onChange={(e) =>
-                      setEditFields((prev) => ({
-                        ...prev,
-                        lifestyleNotes: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
+                ))}
+              </section>
 
               {/* Clinical Reports */}
-              <div className="mt-6 border-t border-border pt-4">
-                <div className="font-medium text-text-primary mb-2">
+              <section className="mt-2 border-t border-border pt-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-2">
                   Clinical Reports & Doctor Notes
-                </div>
+                </h4>
 
                 {/* Existing reports list */}
-                <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                <div className="space-y-2 mb-4 max-h-48 overflow-y-auto bg-muted/20 rounded-md p-2 border border-border">
                   {(selectedPatient?.clinicalReports || []).length === 0 && (
                     <p className="text-xs text-text-secondary">
                       No reports created yet for this patient.
@@ -863,7 +857,7 @@ const PatientManagement = () => {
                     .map((rep, idx) => (
                       <div
                         key={rep._id || idx}
-                        className="border border-border rounded-md p-2 bg-muted/20"
+                        className="border border-border rounded-md p-2 bg-white"
                       >
                         <div className="flex justify-between items-center mb-1">
                           <div className="text-sm font-semibold text-text-primary">
@@ -1005,13 +999,13 @@ const PatientManagement = () => {
                     </Button>
                   </div>
                 </div>
-              </div>
+              </section>
 
               {/* Next Appointment */}
-              <div>
-                <div className="font-medium text-text-primary mb-1">
+              <section>
+                <h4 className="text-sm font-semibold text-text-primary mb-1">
                   Next Appointment
-                </div>
+                </h4>
                 <Input
                   type="datetime-local"
                   value={editFields.nextAppointment}
@@ -1022,16 +1016,16 @@ const PatientManagement = () => {
                     })
                   }
                 />
-              </div>
+              </section>
 
-              {/* Diet Plan Builder */}
-              <div className="mt-6 border-t border-border pt-4">
-                <div className="font-medium text-text-primary mb-2">
+              {/* Diet Plan */}
+              <section className="mt-4 border-t border-border pt-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-2">
                   Diet Plan
-                </div>
+                </h4>
                 <p className="text-xs text-text-secondary mb-3">
-                  Open the full-screen diet planner to design or edit this patient&apos;s meal
-                  plan.
+                  Open the full-screen diet planner to design or edit this
+                  patient's meal plan.
                 </p>
 
                 <Button
@@ -1047,14 +1041,14 @@ const PatientManagement = () => {
                 >
                   Open Diet Planner
                 </Button>
-              </div>
+              </section>
+            </div>
 
-              {/* Save */}
-              <div className="pt-4 flex justify-end">
-                <Button variant="default" onClick={handleUpdatePatient}>
-                  Save Changes
-                </Button>
-              </div>
+            {/* Footer: Save button */}
+            <div className="px-6 py-4 border-t border-border flex justify-end bg-white rounded-b-2xl">
+              <Button variant="default" onClick={handleUpdatePatient}>
+                Save Changes
+              </Button>
             </div>
           </div>
         </div>

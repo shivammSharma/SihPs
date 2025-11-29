@@ -8,6 +8,16 @@
   --ayur-text-med: #555555;
   --ayur-bg: #FAF9F6;
 }
+@keyframes drawerSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes drawerSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
 
 /* Background + text helpers */
 .bg-cream { background-color: var(--ayur-bg); }
