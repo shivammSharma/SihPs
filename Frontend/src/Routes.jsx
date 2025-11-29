@@ -5,6 +5,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 import NotFound from "pages/NotFound";
+import AuthSelection from "./pages/auth-selection";
+
 
 // Main pages
 import HomepageAyurNutriPlatform from "./pages/homepage-ayur-nutri-platform";
@@ -22,7 +24,6 @@ import ResetPassword from "./pages/sign-in/ResetPassword";
 
 // Diet builder (doctor)
 import DoctorDietBuilderPage from "./pages/professional-dashboard-portal/components/DoctorDietBuilderPage.jsx";
-
 import FoodScan from "./pages/personal-wellness-hub/components/FoodScan";
 import FoodScanResult from "./pages/personal-wellness-hub/components/FoodScanResult";
 
@@ -38,6 +39,8 @@ const AppRoutes = () => {
           <Route path="/signup" element={<SignupPatient />} />
           <Route path="/signup/doctor" element={<SignupDoctor />} />
           <Route path="/reset" element={<ResetPassword />} />
+          <Route path="/auth-selection" element={<AuthSelection />} />
+
 
           {/* Public / main pages */}
           <Route
@@ -74,19 +77,20 @@ const AppRoutes = () => {
             path="/doctor/diet-builder/:patientId"
             element={<DoctorDietBuilderPage />}
           />
-
-          {/* Fallback */}
-          <Route path="*" element={<NotFound />} />
-
-          <Route
+          
+           <Route
           path="/personal-wellness-hub/food-scan"
           element={<FoodScan />}
         />
-        <Route
+      
+
+            <Route
           path="/personal-wellness-hub/food-scan/result"
           element={<FoodScanResult />}
         />
 
+          {/* Fallback */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </ErrorBoundary>
     </BrowserRouter>

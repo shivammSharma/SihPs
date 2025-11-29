@@ -68,7 +68,8 @@ const Header = ({ className = "" }) => {
 
 const handleSignInClick = () => {
   closeMobileMenu();
-  navigate("/join");
+  navigate("/auth-selection");
+
 };
 
 

@@ -9,12 +9,11 @@ import patientsRouter from "./routes/patients.js";
 import authRouter from "./routes/auth.js";
 import patientPortalRouter from "./routes/patientPortal.js";
 import patientMeRouter from "./routes/patientMe.js";
+import subscribeRouter from "./routes/subscribe.js";
 import foodScanRoutes from "./routes/foodScanRoutes.js";
 
 
 dotenv.config();
-console.log("ENV KEY:", process.env.GEMINI_API_KEY);
-
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,15 +25,18 @@ app.use(express.json());
 
 app.use("/api/patients", patientsRouter);
 app.use("/api/auth", authRouter);
-app.use("/api/patient", patientPortalRouter); 
+app.use("/api/patient", patientPortalRouter);
 app.use("/api/patient", patientMeRouter);
 app.use("/api/food-scan", foodScanRoutes);
-
+app.use("/api", subscribeRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", ts: new Date().toISOString() });
 });
 
+// =====================================
+// 🚀 MISSING PART (THIS STARTS THE SERVER)
+// =====================================
 const PORT = process.env.PORT || 9000;
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ayurveda";

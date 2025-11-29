@@ -7,31 +7,35 @@ const DoctorDietBuilderPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#f9f6ef] p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-800">
-          Diet Plan Builder
+    <div className="min-h-screen bg-[#F7F3EC] p-6 flex flex-col items-center">
+
+      {/* HEADER */}
+      <div className="w-full max-w-6xl flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
+          🍽️ Diet Plan Builder
         </h1>
 
         <button
           onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+          className="px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition"
         >
           ⬅ Back
         </button>
       </div>
 
-      {/* Subtitle */}
-      <p className="text-gray-600 mb-6">
-        Creating diet chart for patient:
-        <span className="font-medium ml-1 text-emerald-700">
-          {patientId}
-        </span>
-      </p>
+      {/* SUBTITLE */}
+      <div className="w-full max-w-6xl mb-4">
+        <p className="text-gray-700 text-sm">
+          Building personalized diet plan for:
+          <span className="ml-1 font-semibold text-green-700">{patientId}</span>
+        </p>
+      </div>
 
-      {/* Food Selector */}
-      <FoodCardList patientId={patientId} />
+      {/* FOOD LIST + DIET SUMMARY */}
+      <div className="w-full max-w-6xl">
+        <FoodCardList patientId={patientId} />
+      </div>
+
     </div>
   );
 };

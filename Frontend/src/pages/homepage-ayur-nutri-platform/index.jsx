@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet";
 import Header from "../../components/ui/Header";
 import HeroSection from "./components/HeroSection";
 import PlatformShowcase from "./components/PlatformShowcase";
-import SocialProof from "./components/SocialProof";
+
 import LiveDemo from "./components/LiveDemo";
 import Footer from "./components/Footer";
 
@@ -51,8 +51,7 @@ const HomepageAyurNutriPlatform = () => {
         {/* Platform Showcase */}
         <PlatformShowcase />
 
-        {/* Social Proof */}
-        <SocialProof />
+        
 
         {/* Live Demo */}
         <LiveDemo />

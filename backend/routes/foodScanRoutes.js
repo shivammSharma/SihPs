@@ -6,7 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 dotenv.config();
 
 const router = express.Router();
-console.log("Gemini API Key:", process.env.GEMINI_API_KEY);
+
 
 // ---- Gemini Setup ----
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
