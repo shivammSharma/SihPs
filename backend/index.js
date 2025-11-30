@@ -11,6 +11,7 @@ import patientPortalRouter from "./routes/patientPortal.js";
 import patientMeRouter from "./routes/patientMe.js";
 import subscribeRouter from "./routes/subscribe.js";
 import foodScanRoutes from "./routes/foodScanRoutes.js";
+import chatbotRoute from "./routes/chatbot.js";
 
 
 dotenv.config();
@@ -29,6 +30,8 @@ app.use("/api/patient", patientPortalRouter);
 app.use("/api/patient", patientMeRouter);
 app.use("/api/food-scan", foodScanRoutes);
 app.use("/api", subscribeRouter);
+app.use("/api/chatbot", chatbotRoute);
+
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", ts: new Date().toISOString() });
