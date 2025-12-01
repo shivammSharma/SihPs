@@ -5,7 +5,6 @@ import Icon from "../AppIcon";
 import Button from "./Button";
 import useAuth from "../../hooks/useAuth";
 
-
 const Header = ({ className = "", isHomePage = false }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -16,17 +15,15 @@ const Header = ({ className = "", isHomePage = false }) => {
 
   const pathname = location?.pathname || "/";
 
-  // use homepage flag + paths
+  // Detect homepage (more robust)
   const isHome =
-    isHomePage ||
     pathname === "/" ||
-    pathname === "/homepage-ayur-nutri-platform";
+    pathname.includes("homepage") ||
+    pathname.startsWith("/homepage-ayur-nutri-platform");
 
-  const isDoctorDashboard =
-    pathname.startsWith("/professional-dashboard-portal");
+  const isDoctorDashboard = pathname.startsWith("/professional-dashboard-portal");
   const isAuthSelection = pathname.startsWith("/auth-selection");
 
-  // Detect actual role
   const role = isDoctor ? "doctor" : isPatient ? "patient" : null;
 
   // Scroll effect
@@ -69,7 +66,7 @@ const Header = ({ className = "", isHomePage = false }) => {
     >
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-3 items-center h-16 px-4 sm:px-6 lg:px-8">
-          
+
           {/* Logo */}
           <div className="col-span-1 flex items-center">
             <Link
@@ -105,18 +102,6 @@ const Header = ({ className = "", isHomePage = false }) => {
               <div className="flex items-center space-x-1 bg-background/80 backdrop-blur-sm rounded-xl p-2 organic-shadow">
 
                 <button
-                  onClick={() => navigate("/ayurvedic-intelligence-center")}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm ${
-                    pathname === "/ayurvedic-intelligence-center"
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-text-secondary hover:text-primary hover:bg-muted/50"
-                  }`}
-                >
-                  <Icon name="Brain" size={16} />
-                  <span>Intelligence Center</span>
-                </button>
-
-                <button
                   onClick={handleProfessionalPortal}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm ${
                     pathname.startsWith("/professional-dashboard-portal")
@@ -147,19 +132,30 @@ const Header = ({ className = "", isHomePage = false }) => {
           {/* Right Section */}
           <div className="col-span-1 flex items-center justify-end space-x-3">
 
-            {/* SIGN IN BUTTON on Homepage */}
-            {isHome && !isAuthenticated && (
-              <Button
-                variant="default"
-                size="sm"
-                className="bg-brand-gold hover:bg-brand-gold/90 hidden lg:flex"
-                onClick={handleSignInClick}
-              >
-                Sign In
-              </Button>
-            )}
+            {/* HOMEPAGE AUTH LOGIC */}
+       {/* HOMEPAGE AUTH LOGIC */}
+{isHome && (
+  (() => {
+    if (isAuthenticated) {
+      // auto-logout silently when user reaches homepage
+      logout();
+    }
 
-            {/* Logged-in user */}
+    return (
+      <Button
+        variant="default"
+        size="sm"
+        className="bg-brand-gold hover:bg-brand-gold/90 hidden lg:flex"
+        onClick={handleSignInClick}
+      >
+        Sign In
+      </Button>
+    );
+  })()
+)}
+
+
+            {/* Logged-in user (ONLY on dashboard pages) */}
             {!isHome && isAuthenticated && (
               <div className="hidden lg:flex items-center space-x-2">
                 <Button
