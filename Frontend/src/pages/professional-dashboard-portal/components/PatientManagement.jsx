@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
+import WeeklyPlanSummaryCard from "./WeeklyPlanSummaryCard";
+
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
@@ -170,6 +172,7 @@ const PatientManagement = () => {
       setLoading(false);
     }
   };
+  
 
   const recalcBmi = (heightCm, weightKg) => {
     const h = Number(heightCm);
@@ -1041,6 +1044,15 @@ const PatientManagement = () => {
                 >
                   Open Diet Planner
                 </Button>
+               <WeeklyPlanSummaryCard
+    clinicalPatientId={selectedPatient._id}
+    onOpenPlanner={() =>
+      navigate(`/doctor/week-planner/${selectedPatient._id}`, {
+        state: { patientName: selectedPatient.name },
+      })
+    }
+  />
+
               </section>
             </div>
 

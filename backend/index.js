@@ -38,7 +38,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // =====================================
-// 🚀 MISSING PART (THIS STARTS THE SERVER)
+// MISSING PART (THIS STARTS THE SERVER)
 // =====================================
 const PORT = process.env.PORT || 9000;
 const MONGODB_URI =

@@ -168,9 +168,15 @@ export default function FoodCardList({ dataSource, patientId, onDietSaved }) {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
+      const updatedPatient = res.data;
       setSaveMsg("Saved successfully!");
-      onDietSaved && onDietSaved(res.data);
+      if (onDietSaved) {
+        try {
+          onDietSaved(updatedPatient);
+        } catch (e) {
+          console.warn("onDietSaved threw:", e);
+        }
+      }
     } catch (err) {
       console.error("Save diet plan error:", err);
       setSaveMsg("Failed to save.");
