@@ -8,9 +8,11 @@ import useAuth from "../../hooks/useAuth";
 
 import DashboardOverview from './components/DashboardOverview';
 import PatientManagement from './components/PatientManagement';
-import PlanGeneration from './components/PlanGeneration';
+
 import AnalyticsSuite from './components/AnalyticsSuite';
 import CommunicationTools from './components/CommunicationTools';
+import DoctorDietBuilderPage from './components/DoctorDietBuilderPage';
+
 
 const ProfessionalDashboardPortal = () => {
   const { user, isDoctor } = useAuth();
@@ -42,7 +44,7 @@ const ProfessionalDashboardPortal = () => {
       case 'patients':
         return <PatientManagement />;
       case 'plans':
-        return <PlanGeneration />;
+        return <DoctorDietBuilderPage />;
       case 'analytics':
         return <AnalyticsSuite />;
       case 'communication':

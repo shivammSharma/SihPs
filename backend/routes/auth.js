@@ -1,52 +1,44 @@
-import express from "express";
+import Patient from "../models/Patient.js";
+import Doctor from "../models/doctor.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import AuthPatient from "../models/authPatient.js";
-import Doctor from "../models/doctor.js";
+import express from "express";
 
 const router = express.Router();
 
+// Helper: Create JWT Token
 function createToken(id, role, email) {
-  const payload = { id, role, email };
-
-  return jwt.sign(
-    payload,
-    process.env.JWT_SECRET || "dev-secret",
-    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
-  );
+  return jwt.sign({ id, role, email }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
 }
 
-/* ========= PATIENT SIGNUP ========= */
+/* ============================
+   PATIENT SIGNUP
+   ============================ */
 router.post("/signup/patient", async (req, res) => {
   try {
-    let { fullName, email, password, phoneNumber, gender } = req.body || {};
+    let { fullName, email, password, phoneNumber, gender } = req.body;
 
     if (!fullName || !email || !password || !phoneNumber || !gender) {
-      return res.status(400).json({
-        message:
-          "fullName, email, password, phoneNumber and gender are required",
-      });
+      return res.status(400).json({ message: "All fields are required." });
     }
 
-    fullName = String(fullName).trim();
-    email = String(email).trim().toLowerCase();
-    phoneNumber = String(phoneNumber).trim();
-    gender = String(gender).trim();
+    email = email.trim().toLowerCase();
 
-    const existing = await AuthPatient.findOne({
+    const exists = await Patient.findOne({
       $or: [{ email }, { phoneNumber }],
     });
 
-    if (existing) {
+    if (exists) {
       return res
         .status(409)
-        .json({ message: "Email or phone number already in use" });
+        .json({ message: "Email or phone already in use" });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    const patient = await AuthPatient.create({
+    const patient = await Patient.create({
       fullName,
       email,
       phoneNumber,
@@ -54,98 +46,35 @@ router.post("/signup/patient", async (req, res) => {
       passwordHash,
     });
 
-    const token = createToken(patient._id, "patient", patient.email);
+    const token = createToken(patient._id, "patient", email);
 
     return res.status(201).json({
       message: "Patient registered successfully",
+      patientId: patient._id, // ⭐ IMPORTANT
       user: {
         id: patient._id,
         role: "patient",
-        fullName: patient.fullName,
-        email: patient.email,
-        phoneNumber: patient.phoneNumber,
-        gender: patient.gender,
+        fullName,
+        email,
+        phoneNumber,
+        gender,
       },
       token,
     });
   } catch (err) {
-    console.error("Patient signup error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.log("Signup error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-/* ========= DOCTOR SIGNUP ========= */
-router.post("/signup/doctor", async (req, res) => {
-  try {
-    let { fullName, email, password, phoneNumber, gender } = req.body || {};
-
-    if (!fullName || !email || !password) {
-      return res.status(400).json({
-        message: "fullName, email and password are required",
-      });
-    }
-
-    fullName = String(fullName).trim();
-    email = String(email).trim().toLowerCase();
-    if (phoneNumber) phoneNumber = String(phoneNumber).trim();
-    if (gender) gender = String(gender).trim();
-
-    const orConditions = [{ email }];
-    if (phoneNumber) orConditions.push({ phoneNumber });
-
-    const existing = await Doctor.findOne({ $or: orConditions });
-
-    if (existing) {
-      return res
-        .status(409)
-        .json({ message: "Email or phone number already in use" });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    const doctor = await Doctor.create({
-      fullName,
-      email,
-      passwordHash,
-      phoneNumber: phoneNumber || undefined,
-      gender: gender || undefined,
-    });
-
-    const token = createToken(doctor._id, "doctor", doctor.email);
-
-    return res.status(201).json({
-      message: "Doctor registered successfully",
-      user: {
-        id: doctor._id,
-        role: "doctor",
-        fullName: doctor.fullName,
-        email: doctor.email,
-        phoneNumber: doctor.phoneNumber,
-        gender: doctor.gender,
-      },
-      token,
-    });
-  } catch (err) {
-    console.error("Doctor signup error:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-});
-
-/* ========= PATIENT LOGIN ========= */
+/* ============================
+   PATIENT LOGIN (FIXED)
+   ============================ */
 router.post("/login", async (req, res) => {
   try {
-    let { emailOrPhone, password } = req.body || {};
+    const { emailOrPhone, password } = req.body;
 
-    if (!emailOrPhone || !password) {
-      return res
-        .status(400)
-        .json({ message: "emailOrPhone and password are required" });
-    }
-
-    emailOrPhone = String(emailOrPhone).trim();
-
-    const patient = await AuthPatient.findOne({
+    const patient = await Patient.findOne({
       $or: [
         { email: emailOrPhone.toLowerCase() },
         { phoneNumber: emailOrPhone },
@@ -165,6 +94,7 @@ router.post("/login", async (req, res) => {
 
     return res.json({
       message: "Login successful",
+      patientId: patient._id, // ⭐ CRITICAL FOR BOOKING
       user: {
         id: patient._id,
         role: "patient",
@@ -176,23 +106,89 @@ router.post("/login", async (req, res) => {
       token,
     });
   } catch (err) {
-    console.error("Patient login error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.log("Login error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-/* ========= DOCTOR LOGIN ========= */
-router.post("/login/doctor", async (req, res) => {
+/* ============================
+   DOCTOR SIGNUP (AUTO VERIFIED)
+   ============================ */
+router.post("/signup/doctor", async (req, res) => {
   try {
-    let { emailOrPhone, password } = req.body || {};
+    let {
+      fullName,
+      email,
+      password,
+      phoneNumber,
+      gender,
+      reg_no,
+      council,
+    } = req.body;
 
-    if (!emailOrPhone || !password) {
-      return res
-        .status(400)
-        .json({ message: "emailOrPhone and password are required" });
+    if (!fullName || !email || !password || !reg_no || !council) {
+      return res.status(400).json({
+        message: "fullName, email, password, reg_no, council are required",
+      });
     }
 
-    emailOrPhone = String(emailOrPhone).trim();
+    email = email.toLowerCase().trim();
+
+    const query = [{ email }];
+    if (phoneNumber && phoneNumber.trim() !== "") {
+      query.push({ phoneNumber });
+    }
+
+    const exists = await Doctor.findOne({ $or: query });
+
+    if (exists) {
+      return res
+        .status(409)
+        .json({ message: "Email or phone number already in use" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const doctor = await Doctor.create({
+      fullName,
+      email,
+      phoneNumber: phoneNumber?.trim() || undefined,
+      gender,
+      passwordHash,
+      reg_no,
+      council,
+      verified: true, // AUTO VERIFIED
+    });
+
+    const token = createToken(doctor._id, "doctor", email);
+
+    return res.status(201).json({
+      message: "Doctor registered successfully",
+      user: {
+        id: doctor._id,
+        role: "doctor",
+        fullName,
+        email,
+        phoneNumber,
+        gender,
+        reg_no,
+        council,
+        verified: true,
+      },
+      token,
+    });
+  } catch (err) {
+    console.log("Doctor signup error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ============================
+   DOCTOR LOGIN
+   ============================ */
+router.post("/login/doctor", async (req, res) => {
+  try {
+    const { emailOrPhone, password } = req.body;
 
     const doctor = await Doctor.findOne({
       $or: [
@@ -201,14 +197,17 @@ router.post("/login/doctor", async (req, res) => {
       ],
     });
 
-    if (!doctor) {
+    if (!doctor)
       return res.status(401).json({ message: "Invalid credentials" });
-    }
+
+    if (!doctor.verified)
+      return res
+        .status(403)
+        .json({ message: "Doctor not verified. Cannot login." });
 
     const ok = await bcrypt.compare(password, doctor.passwordHash);
-    if (!ok) {
+    if (!ok)
       return res.status(401).json({ message: "Invalid credentials" });
-    }
 
     const token = createToken(doctor._id, "doctor", doctor.email);
 
@@ -221,12 +220,15 @@ router.post("/login/doctor", async (req, res) => {
         email: doctor.email,
         phoneNumber: doctor.phoneNumber,
         gender: doctor.gender,
+        reg_no: doctor.reg_no,
+        council: doctor.council,
+        verified: doctor.verified,
       },
       token,
     });
   } catch (err) {
-    console.error("Doctor login error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.log("Doctor login error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
+import WeeklyPlanSummaryCard from "./WeeklyPlanSummaryCard";
+
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
@@ -30,7 +32,7 @@ const PatientManagement = () => {
 
   const [errorMsg, setErrorMsg] = useState("");
 
-  // details/edit drawer
+  // details/edit modal
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [editFields, setEditFields] = useState({
@@ -170,6 +172,7 @@ const PatientManagement = () => {
       setLoading(false);
     }
   };
+  
 
   const recalcBmi = (heightCm, weightKg) => {
     const h = Number(heightCm);
@@ -682,107 +685,87 @@ const PatientManagement = () => {
       )}
 
       {/* Details / Edit Drawer */}
-{showDetails && selectedPatient && (
-  <div className="fixed inset-0 flex justify-end bg-black/40 backdrop-blur-sm z-50">
-    <div className="w-full lg:max-w-4xl h-full bg-white shadow-2xl organic-shadow flex flex-col">
-      {/* Drawer header */}
-      <div className="border-b border-border bg-gradient-to-r from-emerald-50 via-white to-emerald-50 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-semibold text-text-primary">
-            {selectedPatient.name}
-          </h3>
-          <p className="text-xs text-text-secondary mt-0.5">
-            {selectedPatient.age || "-"} years ·{" "}
-            {selectedPatient.dosha || "Dosha not set"}
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowDetails(false)}
-        >
-          Close
-        </Button>
-      </div>
-
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="space-y-6 text-sm">
-          {/* Top summary cards */}
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* Basic Info */}
-            <div className="rounded-xl border border-border bg-muted/20 p-4">
-              <div className="font-medium text-text-primary mb-1">
-                Basic Info
-              </div>
-              <div className="space-y-1 text-text-secondary">
-                <div>
-                  <span className="font-semibold">Age:</span>{" "}
-                  {selectedPatient.age || "-"}
-                </div>
-                <div>
-                  <span className="font-semibold">Dosha:</span>{" "}
-                  {selectedPatient.dosha || "-"}
-                </div>
-              </div>
+      {showDetails && selectedPatient && (
+        <div className="fixed inset-0 flex justify-end bg-black/30 z-50">
+          <div className="w-full max-w-md h-full bg-white shadow-xl p-6 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                {selectedPatient.name}
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDetails(false)}
+              >
+                Close
+              </Button>
             </div>
 
-            {/* Account */}
-            {selectedPatient.patientAccountId && (
-              <div className="rounded-xl border border-border bg-muted/10 p-4">
-                <div className="font-medium text-text-primary mb-1">
-                  Linked Account
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="font-medium text-text-primary">
+                  Basic Info
                 </div>
-                <div className="space-y-1 text-text-secondary">
-                  <div>
+                <div className="text-text-secondary">
+                  Age: {selectedPatient.age || "-"}
+                </div>
+                <div className="text-text-secondary">
+                  Dosha: {selectedPatient.dosha || "-"}
+                </div>
+              </div>
+
+              {selectedPatient.patientAccountId && (
+                <div>
+                  <div className="font-medium text-text-primary">
+                    Account
+                  </div>
+                  <div className="text-text-secondary">
                     Name: {selectedPatient.patientAccountId.fullName}
                   </div>
-                  <div>Email: {selectedPatient.patientAccountId.email}</div>
-                  <div>
+                  <div className="text-text-secondary">
+                    Email: {selectedPatient.patientAccountId.email}
+                  </div>
+                  <div className="text-text-secondary">
                     Phone: {selectedPatient.patientAccountId.phoneNumber}
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* Condition & Status */}
-          <div className="grid lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <div className="font-medium text-text-primary mb-1">
-                Condition
+              <div>
+                <div className="font-medium text-text-primary mb-1">
+                  Condition
+                </div>
+                <textarea
+                  className="w-full border border-border rounded-md p-2 text-sm"
+                  rows={3}
+                  value={editFields.condition}
+                  onChange={(e) =>
+                    setEditFields({
+                      ...editFields,
+                      condition: e.target.value,
+                    })
+                  }
+                />
               </div>
-              <textarea
-                className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                rows={3}
-                value={editFields.condition}
-                onChange={(e) =>
-                  setEditFields({
-                    ...editFields,
-                    condition: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div>
-              <div className="font-medium text-text-primary mb-1">
-                Treatment Status
-              </div>
-              <Select
-                options={filterOptions.filter((o) => o.value !== "all")}
-                value={editFields.status}
-                onChange={(val) =>
-                  setEditFields({ ...editFields, status: val })
-                }
-              />
-            </div>
-          </div>
 
-          {/* Health Profile */}
-          <div className="rounded-xl border border-border bg-muted/10 p-4 space-y-3">
-            <div className="font-medium text-text-primary">
-              Health Profile
-            </div>
+              <div>
+                <div className="font-medium text-text-primary mb-1">
+                  Status
+                </div>
+                <Select
+                  options={filterOptions.filter((o) => o.value !== "all")}
+                  value={editFields.status}
+                  onChange={(val) =>
+                    setEditFields({ ...editFields, status: val })
+                  }
+                />
+              </div>
+
+              {/* Health Profile */}
+              <div>
+                <div className="font-medium text-text-primary mb-1">
+                  Health Profile
+                </div>
 
             <div className="grid md:grid-cols-2 gap-3">
               <Input
@@ -865,132 +848,125 @@ const PatientManagement = () => {
               />
             </div>
 
-            <div className="grid md:grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs font-medium text-text-secondary mb-1">
-                  Allergies
-                </div>
-                <textarea
-                  className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  rows={2}
-                  value={editFields.allergies}
-                  onChange={(e) =>
-                    setEditFields((prev) => ({
-                      ...prev,
-                      allergies: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <div className="text-xs font-medium text-text-secondary mb-1">
-                  Medications
-                </div>
-                <textarea
-                  className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  rows={2}
-                  value={editFields.medications}
-                  onChange={(e) =>
-                    setEditFields((prev) => ({
-                      ...prev,
-                      medications: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs font-medium text-text-secondary mb-1">
-                  Chronic Conditions
-                </div>
-                <textarea
-                  className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  rows={2}
-                  value={editFields.chronicConditions}
-                  onChange={(e) =>
-                    setEditFields((prev) => ({
-                      ...prev,
-                      chronicConditions: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <div className="text-xs font-medium text-text-secondary mb-1">
-                  Lifestyle Notes
-                </div>
-                <textarea
-                  className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  rows={3}
-                  placeholder="Sleep pattern, stress level, work type, exercise, etc."
-                  value={editFields.lifestyleNotes}
-                  onChange={(e) =>
-                    setEditFields((prev) => ({
-                      ...prev,
-                      lifestyleNotes: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Clinical Reports */}
-          <div className="mt-2 border-t border-border pt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="font-medium text-text-primary">
-                Clinical Reports & Doctor Notes
-              </div>
-              <span className="text-[11px] text-text-secondary">
-                {(selectedPatient?.clinicalReports || []).length} reports
-              </span>
-            </div>
-
-            {/* Existing reports list */}
-            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-              {(selectedPatient?.clinicalReports || []).length === 0 && (
-                <p className="text-xs text-text-secondary">
-                  No reports created yet for this patient.
-                </p>
-              )}
-
-              {(selectedPatient?.clinicalReports || [])
-                .slice()
-                .reverse()
-                .map((rep, idx) => (
-                  <div
-                    key={rep._id || idx}
-                    className="border border-border rounded-md p-2 bg-muted/20"
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="text-sm font-semibold text-text-primary">
-                        {rep.title || "Clinical Note"}
-                      </div>
-                      <div className="text-[10px] text-text-secondary">
-                        {rep.createdAt
-                          ? new Date(rep.createdAt).toLocaleString([], {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })
-                          : ""}
-                      </div>
-                    </div>
-                    {rep.summary && (
-                      <div className="text-xs text-text-secondary mb-1">
-                        {rep.summary}
-                      </div>
-                    )}
-                    {rep.diagnosis && (
-                      <div className="text-[11px] text-text-secondary">
-                        <span className="font-semibold">Dx: </span>
-                        {rep.diagnosis}
-                      </div>
-                    )}
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-text-secondary mb-1">
+                    Allergies
                   </div>
-                ))}
-            </div>
+                  <textarea
+                    className="w-full border border-border rounded-md p-2 text-sm"
+                    rows={2}
+                    value={editFields.allergies}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        allergies: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-text-secondary mb-1">
+                    Medications
+                  </div>
+                  <textarea
+                    className="w-full border border-border rounded-md p-2 text-sm"
+                    rows={2}
+                    value={editFields.medications}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        medications: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-text-secondary mb-1">
+                    Chronic Conditions
+                  </div>
+                  <textarea
+                    className="w-full border border-border rounded-md p-2 text-sm"
+                    rows={2}
+                    value={editFields.chronicConditions}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        chronicConditions: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-text-secondary mb-1">
+                    Lifestyle Notes
+                  </div>
+                  <textarea
+                    className="w-full border border-border rounded-md p-2 text-sm"
+                    rows={3}
+                    placeholder="Sleep pattern, stress level, work type, exercise, etc."
+                    value={editFields.lifestyleNotes}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        lifestyleNotes: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Clinical Reports */}
+              <div className="mt-6 border-t border-border pt-4">
+                <div className="font-medium text-text-primary mb-2">
+                  Clinical Reports & Doctor Notes
+                </div>
+
+                {/* Existing reports list */}
+                <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                  {(selectedPatient?.clinicalReports || []).length === 0 && (
+                    <p className="text-xs text-text-secondary">
+                      No reports created yet for this patient.
+                    </p>
+                  )}
+
+                  {(selectedPatient?.clinicalReports || [])
+                    .slice()
+                    .reverse()
+                    .map((rep, idx) => (
+                      <div
+                        key={rep._id || idx}
+                        className="border border-border rounded-md p-2 bg-muted/20"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="text-sm font-semibold text-text-primary">
+                            {rep.title || "Clinical Note"}
+                          </div>
+                          <div className="text-[10px] text-text-secondary">
+                            {rep.createdAt
+                              ? new Date(rep.createdAt).toLocaleString([], {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                })
+                              : ""}
+                          </div>
+                        </div>
+                        {rep.summary && (
+                          <div className="text-xs text-text-secondary mb-1">
+                            {rep.summary}
+                          </div>
+                        )}
+                        {rep.diagnosis && (
+                          <div className="text-[11px] text-text-secondary">
+                            <span className="font-semibold">Dx: </span>
+                            {rep.diagnosis}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
 
             {/* New report form */}
             <div className="space-y-2 rounded-xl border border-border bg-muted/10 p-4">
@@ -1094,73 +1070,70 @@ const PatientManagement = () => {
                 />
               </div>
 
-              <div className="flex justify-end pt-2">
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleCreateReport}
+                    >
+                      Save Clinical Report
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Next Appointment */}
+              <div>
+                <div className="font-medium text-text-primary mb-1">
+                  Next Appointment
+                </div>
+                <Input
+                  type="datetime-local"
+                  value={editFields.nextAppointment}
+                  onChange={(e) =>
+                    setEditFields({
+                      ...editFields,
+                      nextAppointment: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              {/* Diet Plan Builder */}
+              <div className="mt-6 border-t border-border pt-4">
+                <div className="font-medium text-text-primary mb-2">
+                  Diet Plan
+                </div>
+                <p className="text-xs text-text-secondary mb-3">
+                  Open the full-screen diet planner to design or edit this patient&apos;s meal
+                  plan.
+                </p>
+
                 <Button
                   variant="default"
-                  size="sm"
-                  onClick={handleCreateReport}
+                  className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
+                  onClick={() => {
+                    navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
+                      state: {
+                        patientName: selectedPatient.name,
+                      },
+                    });
+                  }}
                 >
-                  Save Clinical Report
+                  Open Diet Planner
+                </Button>
+              </div>
+
+              {/* Save */}
+              <div className="pt-4 flex justify-end">
+                <Button variant="default" onClick={handleUpdatePatient}>
+                  Save Changes
                 </Button>
               </div>
             </div>
           </div>
-
-          {/* Next Appointment + Diet Plan */}
-          <div className="grid md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <div className="font-medium text-text-primary mb-1">
-                Next Appointment
-              </div>
-              <Input
-                type="datetime-local"
-                value={editFields.nextAppointment}
-                onChange={(e) =>
-                  setEditFields({
-                    ...editFields,
-                    nextAppointment: e.target.value,
-                  })
-                }
-              />
-            </div>
-
-            <div className="border border-border rounded-xl p-3 bg-muted/10">
-              <div className="font-medium text-text-primary mb-1">
-                Diet Plan
-              </div>
-              <p className="text-xs text-text-secondary mb-3">
-                Open the full-screen diet planner to design or edit this
-                patient&apos;s meal plan.
-              </p>
-
-              <Button
-                variant="default"
-                className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
-                onClick={() => {
-                  navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
-                    state: {
-                      patientName: selectedPatient.name,
-                    },
-                  });
-                }}
-              >
-                Open Diet Planner
-              </Button>
-            </div>
-          </div>
         </div>
-      </div>
-
-      {/* Footer actions */}
-      <div className="border-t border-border bg-white px-6 py-3 flex justify-end">
-        <Button variant="default" onClick={handleUpdatePatient}>
-          Save Changes
-        </Button>
-      </div>
-    </div>
-  </div>
-)}
-
+      )}
     </div>
   );
 };

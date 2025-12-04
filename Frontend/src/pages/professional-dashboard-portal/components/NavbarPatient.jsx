@@ -15,7 +15,6 @@ const NavbarPatient = ({
     { id: "analytics", label: "Analytics" },
     { id: "sessions", label: "Sessions" },
     { id: "messages", label: "Messages" },
-    { id: "intelligence-center", label: "Intelligence Center", icon: "Brain" },
   ];
 
   const handleLogout = () => {
