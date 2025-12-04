@@ -27,6 +27,10 @@ import DoctorDietBuilderPage from "./pages/professional-dashboard-portal/compone
 import FoodScan from "./pages/personal-wellness-hub/components/FoodScan";
 import FoodScanResult from "./pages/personal-wellness-hub/components/FoodScanResult";
 
+
+import DoctorWeekPlanner from "./pages/professional-dashboard-portal/components/DoctorWeekPlanner";
+import PatientWeekPlanPage from "./pages/personal-wellness-hub/components/PatientWeekPlanPage"; 
+
 const AppRoutes = () => {
   return (
     <BrowserRouter>
@@ -88,6 +92,15 @@ const AppRoutes = () => {
           path="/personal-wellness-hub/food-scan/result"
           element={<FoodScanResult />}
         />
+        <Route
+  path="/doctor/week-planner/:patientId"
+  element={<DoctorWeekPlanner />}
+/>
+
+<Route
+  path="/patient/week-plan/:patientId/:planId"
+  element={<PatientWeekPlanPage />}
+/>
 
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />

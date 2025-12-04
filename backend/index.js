@@ -13,7 +13,7 @@ import patientMeRouter from "./routes/patientMe.js";
 import subscribeRouter from "./routes/subscribe.js";
 import foodScanRoutes from "./routes/foodScanRoutes.js";
 import chatbotRoute from "./routes/chatbot.js";
-import chatRoutes from "./routes/chat.js";
+import chatRoutes from "./routes/chat.js"; 
 
 // NEW ROUTES (IMPORTANT)
 import doctorRoutes from "./routes/doctors.js";
