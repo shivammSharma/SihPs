@@ -1,12 +1,11 @@
-// src/pages/sign-in/SignupPatient.jsx (or your path)
+// src/pages/sign-in/SignupPatient.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import { Eye, EyeOff } from "lucide-react";
 
-// 👇 Use the same backend base as the rest of your app
-// Make sure VITE_API_BASE_URL is set to "http://localhost:9000" in your .env
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
@@ -18,14 +17,22 @@ const SignupPatient = () => {
   const [gender, setGender] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // shared input styling (border etc.)
+  const inputClassName =
+    "border border-gray-300 rounded-xl bg-white px-3 py-2 " +
+    "focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
 
-    // basic validation
     if (!fullName || !email || !phoneNumber || !gender || !password) {
       setErrorMsg("Please fill all required fields.");
       return;
@@ -44,7 +51,6 @@ const SignupPatient = () => {
     try {
       setLoading(true);
 
-      // send to backend: /api/auth/signup/patient
       const res = await axios.post(`${API_BASE}/api/auth/signup/patient`, {
         fullName: fullName.trim(),
         email: email.trim(),
@@ -62,7 +68,6 @@ const SignupPatient = () => {
         localStorage.setItem("currentUser", JSON.stringify(user));
       }
 
-      // go to patient dashboard
       navigate("/personal-wellness-hub");
     } catch (err) {
       console.error("PATIENT SIGNUP ERROR:", err);
@@ -130,6 +135,7 @@ const SignupPatient = () => {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                className={inputClassName}
               />
 
               <Input
@@ -138,7 +144,7 @@ const SignupPatient = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                className={inputClassName}
               />
 
               <Input
@@ -146,34 +152,76 @@ const SignupPatient = () => {
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="98xxxxxx"
+                className={inputClassName}
               />
 
-              <Input
-                label="Gender"
-                required
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                placeholder="e.g. Male, Female, Non-binary"
-              />
+              {/* Gender dropdown */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Gender <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white
+                             focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
+                >
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Non-binary">Non-binary</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+              </div>
 
-              <Input
-                label="Password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
-              />
+              {/* Password with eye toggle */}
+              <div className="relative">
+                <Input
+                  label="Password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClassName}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 mt-3 cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
 
-              <Input
-                label="Confirm Password"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter your password"
-              />
+              {/* Confirm Password with eye toggle */}
+              <div className="relative">
+                <Input
+                  label="Confirm Password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={inputClassName}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowConfirmPassword((prev) => !prev)
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 mt-3 cursor-pointer"
+                  aria-label={
+                    showConfirmPassword ? "Hide password" : "Show password"
+                  }
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
+                </button>
+              </div>
 
               <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-[#6b7280]">
