@@ -1,4 +1,3 @@
-// backend/models/patient.js
 import mongoose from "mongoose";
 
 // Subschema for clinical reports
@@ -6,83 +5,41 @@ const clinicalReportSchema = new mongoose.Schema(
   {
     doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
 
-    title: { type: String, trim: true },          // e.g. "Initial Assessment"
-    summary: { type: String, trim: true },        // short summary shown in UI
+    title: { type: String, trim: true },
+    summary: { type: String, trim: true },
 
-    diagnosis: { type: String, trim: true },      // doctor's impression / Dx
-    notes: { type: String, trim: true },          // detailed notes
-    testsRecommended: { type: String, trim: true }, // lab tests / imaging
-    plan: { type: String, trim: true },           // diet + lifestyle + meds
+    diagnosis: { type: String, trim: true },
+    notes: { type: String, trim: true },
+    testsRecommended: { type: String, trim: true },
+    plan: { type: String, trim: true },
 
-    followUpDate: { type: Date },                 // when to come next
+    followUpDate: { type: Date },
   },
-  {
-    timestamps: true, // gives createdAt / updatedAt per report
-  }
+  { timestamps: true }
 );
 
 const PatientSchema = new mongoose.Schema(
   {
-    fullName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    fullName: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    phoneNumber: { type: String, required: true, unique: true },
+    gender: { type: String, required: true },
+    passwordHash: { type: String, required: true },
 
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-
-    phoneNumber: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-
-    gender: {
-      type: String,
-      enum: ["Male", "Female", "Other"],
-      required: true,
-    },
-
-    passwordHash: {
-      type: String,
-      required: true,
-    },
-
-    // 🔹 Diet plan for this patient
+    // Diet plan
     dietPlan: {
-      breakfast: {
-        type: [mongoose.Schema.Types.Mixed], // store raw food objects for now
-        default: [],
-      },
-      lunch: {
-        type: [mongoose.Schema.Types.Mixed],
-        default: [],
-      },
-      dinner: {
-        type: [mongoose.Schema.Types.Mixed],
-        default: [],
-      },
-      lastUpdated: {
-        type: Date,
-      },
+      breakfast: [{ type: mongoose.Schema.Types.Mixed }],
+      lunch: [{ type: mongoose.Schema.Types.Mixed }],
+      dinner: [{ type: mongoose.Schema.Types.Mixed }],
+      lastUpdated: Date,
     },
 
-    // 🔹 Clinical reports & doctor notes (ROOT LEVEL, not inside dietPlan)
+    // Doctor reports
     clinicalReports: [clinicalReportSchema],
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Avoid OverwriteModelError in dev / hot reload
-const Patient =
-  mongoose.models.Patient || mongoose.model("Patient", PatientSchema);
-
-export default Patient;
+// Avoid overwrite errors
+export default mongoose.models.Patient ||
+  mongoose.model("Patient", PatientSchema);

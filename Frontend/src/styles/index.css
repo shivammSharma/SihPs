@@ -8,6 +8,7 @@
   --ayur-text-med: #555555;
   --ayur-bg: #FAF9F6;
 }
+
 @keyframes drawerSlideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
@@ -73,3 +74,4 @@ body {
 .animate-fadeInUp {
   animation: fadeInUp 0.7s ease-out forwards;
 }
+

@@ -3,63 +3,6 @@ import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
-const weekDayItemSchema = new mongoose.Schema(
-  {
-    // food object as stored in dietPlan (allow flexible shape)
-    food: { type: Object, default: {} },
-    // checked by patient for this item
-    checked: { type: Boolean, default: false },
-  },
-  { _id: true }
-);
-
-
-const exerciseItemSchema = new mongoose.Schema(
-  {
-    id: { type: String }, // optional id or name
-    name: { type: String, required: true },
-    reps: { type: String }, // e.g. "3x12"
-    durationMinutes: { type: Number }, // optional
-    notes: { type: String },
-    checked: { type: Boolean, default: false },
-  },
-  { _id: true }
-);
-
-
-const weekDaySchema = new mongoose.Schema(
-  {
-    date: { type: Date, required: true }, // absolute date for the day
-    meals: {
-      breakfast: { type: [weekDayItemSchema], default: [] },
-      lunch: { type: [weekDayItemSchema], default: [] },
-      dinner: { type: [weekDayItemSchema], default: [] },
-    },
-    exercises: { type: [exerciseItemSchema], default: [] },
-  },
-  { _id: true }
-);
-
-const weeklyPlanSchema = new mongoose.Schema(
-  {
-    title: { type: String, default: "Weekly Plan" },
-    // weekStartDate identifies the week (e.g., Monday)
-    weekStartDate: { type: Date, required: true },
-    doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
-
-    // days: 7 entries, each with date, meals and exercises
-    days: { type: [weekDaySchema], default: [] },
-
-    // optional summary / progress cached (calculated server-side when saved/updated)
-    progressPercent: { type: Number, default: 0 },
-    durationDays: { type: Number, default: 7 },
-
-  },
-  { _id: true }
-);
-
 // Sub-schema for clinical reports / doctor notes
 const clinicalReportSchema = new Schema(
   {
@@ -134,7 +77,6 @@ const ClinicalPatientSchema = new Schema(
       type: [clinicalReportSchema],
       default: [],
     },
-    weeklyPlans: { type: [weeklyPlanSchema], default: [] },
   },
   { timestamps: true }
 );

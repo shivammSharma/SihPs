@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
-import WeeklyPlanSummaryCard from "./WeeklyPlanSummaryCard";
-
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
@@ -50,6 +48,16 @@ const PatientManagement = () => {
     lifestyleNotes: "",
     dietPreferences: "",
 
+    // NEW – ayurvedic assessment (stored inside lifestyleNotes when saving)
+    prakriti: "",
+    vikriti: "",
+    agni: "",
+    appetite: "",
+    bowelHabits: "",
+    sleepQuality: "",
+    stressLevel: "",
+    exercisePattern: "",
+
     // clinical report fields
     reportTitle: "",
     reportSummary: "",
@@ -76,6 +84,52 @@ const PatientManagement = () => {
     { value: "vata-pitta", label: "Vata-Pitta" },
     { value: "pitta-kapha", label: "Pitta-Kapha" },
     { value: "kapha-vata", label: "Kapha-Vata" },
+  ];
+
+  const agniOptions = [
+    { value: "", label: "Select Agni" },
+    { value: "sama", label: "Samagni (balanced)" },
+    { value: "manda", label: "Mandagni (slow)" },
+    { value: "tikshna", label: "Tikshnagni (sharp)" },
+    { value: "vishama", label: "Vishamagni (irregular)" },
+  ];
+
+  const appetiteOptions = [
+    { value: "", label: "Select Appetite" },
+    { value: "low", label: "Low" },
+    { value: "moderate", label: "Moderate" },
+    { value: "high", label: "High" },
+    { value: "variable", label: "Variable" },
+  ];
+
+  const yesNoOptions = [
+    { value: "", label: "Select" },
+    { value: "yes", label: "Yes" },
+    { value: "no", label: "No" },
+  ];
+
+  const sleepOptions = [
+    { value: "", label: "Select Sleep" },
+    { value: "sound", label: "Sound / Refreshing" },
+    { value: "disturbed", label: "Disturbed" },
+    { value: "difficultyOnset", label: "Difficulty in Onset" },
+    { value: "earlyAwakening", label: "Early Awakening" },
+  ];
+
+  const stressOptions = [
+    { value: "", label: "Select Stress Level" },
+    { value: "low", label: "Low" },
+    { value: "moderate", label: "Moderate" },
+    { value: "high", label: "High" },
+    { value: "veryHigh", label: "Very High" },
+  ];
+
+  const exerciseOptions = [
+    { value: "", label: "Select Activity" },
+    { value: "sedentary", label: "Sedentary" },
+    { value: "light", label: "Light Activity" },
+    { value: "moderate", label: "Moderate Activity" },
+    { value: "intense", label: "Intense / Athlete" },
   ];
 
   const getStatusColor = (status) => {
@@ -172,7 +226,6 @@ const PatientManagement = () => {
       setLoading(false);
     }
   };
-  
 
   const recalcBmi = (heightCm, weightKg) => {
     const h = Number(heightCm);
@@ -268,7 +321,9 @@ const PatientManagement = () => {
       chronicConditions: patient?.chronicConditions || "",
       lifestyleNotes: patient?.lifestyleNotes || "",
       dietPreferences: patient?.dietPreferences || "",
-      // report fields stay as they were (empty unless doctor typed)
+
+      // Ayurvedic extra fields stay as previously typed in this session;
+      // if patient already has lifestyleNotes, doctor can see everything there.
     }));
     setShowDetails(true);
   };
@@ -283,6 +338,26 @@ const PatientManagement = () => {
         return;
       }
 
+      // Build an Ayurvedic block that gets appended into lifestyleNotes
+      const ayuBlockLines = [
+        editFields.prakriti && `Prakriti: ${editFields.prakriti}`,
+        editFields.vikriti && `Vikriti (current): ${editFields.vikriti}`,
+        editFields.agni && `Agni: ${editFields.agni}`,
+        editFields.appetite && `Appetite: ${editFields.appetite}`,
+        editFields.bowelHabits && `Bowel habits: ${editFields.bowelHabits}`,
+        editFields.sleepQuality && `Sleep: ${editFields.sleepQuality}`,
+        editFields.stressLevel && `Stress level: ${editFields.stressLevel}`,
+        editFields.exercisePattern &&
+          `Physical activity: ${editFields.exercisePattern}`,
+      ].filter(Boolean);
+
+      const ayuBlock =
+        ayuBlockLines.length > 0
+          ? `\n\n--- Ayurvedic Assessment ---\n${ayuBlockLines.join("\n")}`
+          : "";
+
+      const lifestyleCombined = `${editFields.lifestyleNotes || ""}${ayuBlock}`;
+
       const payload = {
         condition: editFields.condition,
         status: editFields.status,
@@ -292,13 +367,11 @@ const PatientManagement = () => {
         weightKg: editFields.weightKg ? Number(editFields.weightKg) : null,
         bmi: editFields.bmi ? Number(editFields.bmi) : null,
         bloodPressure: editFields.bloodPressure,
-        heartRate: editFields.heartRate
-          ? Number(editFields.heartRate)
-          : null,
+        heartRate: editFields.heartRate ? Number(editFields.heartRate) : null,
         allergies: editFields.allergies,
         medications: editFields.medications,
         chronicConditions: editFields.chronicConditions,
-        lifestyleNotes: editFields.lifestyleNotes,
+        lifestyleNotes: lifestyleCombined.trim(),
         dietPreferences: editFields.dietPreferences,
       };
 
@@ -556,7 +629,7 @@ const PatientManagement = () => {
               className="mb-3"
             />
             <Input
-              placeholder="Condition"
+              placeholder="Presenting complaint / condition"
               value={newPatient.condition}
               onChange={(e) =>
                 setNewPatient({ ...newPatient, condition: e.target.value })
@@ -615,7 +688,7 @@ const PatientManagement = () => {
       {/* Centered Details / Edit Modal */}
       {showDetails && selectedPatient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-3xl max-h-[80vh] bg-white rounded-2xl shadow-2xl border border-border flex flex-col animate-[modalScaleIn_0.25s_ease-out]">
+          <div className="w-full max-w-4xl max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-border flex flex-col">
             {/* Profile Header Card */}
             <div className="px-6 pt-5 pb-4 border-b bg-gradient-to-r from-emerald-50 to-emerald-100/40">
               <div className="flex items-start justify-between gap-4">
@@ -665,76 +738,171 @@ const PatientManagement = () => {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 text-sm">
-              {/* Basic Info */}
-              <section>
-                <h4 className="text-sm font-semibold text-text-primary mb-2">
-                  Basic Info
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-text-secondary">
+              {/* BASIC INFO */}
+              <section className="border border-border/60 rounded-xl p-4 bg-muted/10">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-text-primary">
+                    Patient Snapshot
+                  </h4>
+                  {selectedPatient.patientAccountId && (
+                    <span className="text-[11px] text-text-secondary">
+                      {selectedPatient.patientAccountId.email} •{" "}
+                      {selectedPatient.patientAccountId.phoneNumber}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-text-secondary text-xs">
                   <div>Age: {selectedPatient.age || "-"}</div>
-                  <div>Dosha: {selectedPatient.dosha || "-"}</div>
+                  <div>Dosha focus: {selectedPatient.dosha || "-"}</div>
+                  <div>
+                    Last Visit:{" "}
+                    {selectedPatient.lastVisit
+                      ? new Date(selectedPatient.lastVisit).toLocaleDateString()
+                      : "-"}
+                  </div>
+                  <div>
+                    Next Appointment:{" "}
+                    {selectedPatient.nextAppointment
+                      ? new Date(
+                          selectedPatient.nextAppointment
+                        ).toLocaleString([], {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })
+                      : "-"}
+                  </div>
                 </div>
               </section>
 
-              {/* Account */}
-              {selectedPatient.patientAccountId && (
-                <section>
-                  <h4 className="text-sm font-semibold text-text-primary mb-2">
-                    Account
-                  </h4>
-                  <div className="space-y-1 text-text-secondary">
-                    <div>
-                      Name: {selectedPatient.patientAccountId.fullName}
+              {/* PRESENTING COMPLAINT & STATUS */}
+              <section className="border border-border/60 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-3">
+                  Presenting Complaint & Clinical Status
+                </h4>
+                <div className="grid md:grid-cols-3 gap-4 mb-3">
+                  <div className="md:col-span-2">
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Chief complaint & brief history
                     </div>
-                    <div>
-                      Email: {selectedPatient.patientAccountId.email}
-                    </div>
-                    <div>
-                      Phone: {selectedPatient.patientAccountId.phoneNumber}
-                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30"
+                      rows={3}
+                      placeholder="Describe the main complaint, onset, duration, and aggravating/relieving factors…"
+                      value={editFields.condition}
+                      onChange={(e) =>
+                        setEditFields({
+                          ...editFields,
+                          condition: e.target.value,
+                        })
+                      }
+                    />
                   </div>
-                </section>
-              )}
-
-              {/* Condition */}
-              <section>
-                <h4 className="text-sm font-semibold text-text-primary mb-2">
-                  Condition
-                </h4>
-                <textarea
-                  className="w-full border border-border rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30"
-                  rows={3}
-                  value={editFields.condition}
-                  onChange={(e) =>
-                    setEditFields({
-                      ...editFields,
-                      condition: e.target.value,
-                    })
-                  }
-                />
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Current status
+                    </div>
+                    <Select
+                      options={filterOptions.filter((o) => o.value !== "all")}
+                      value={editFields.status}
+                      onChange={(val) =>
+                        setEditFields({ ...editFields, status: val })
+                      }
+                    />
+                  </div>
+                </div>
               </section>
 
-              {/* Status */}
-              <section>
-                <h4 className="text-sm font-semibold text-text-primary mb-2">
-                  Status
+              {/* AYURVEDIC ASSESSMENT */}
+              <section className="border border-border/60 rounded-xl p-4 bg-emerald-50/40">
+                <h4 className="text-sm font-semibold text-text-primary mb-3">
+                  Ayurvedic Assessment
                 </h4>
-                <Select
-                  options={filterOptions.filter((o) => o.value !== "all")}
-                  value={editFields.status}
-                  onChange={(val) =>
-                    setEditFields({ ...editFields, status: val })
-                  }
-                />
+                <div className="grid md:grid-cols-3 gap-3 mb-3">
+                  <Input
+                    label="Prakriti (constitution)"
+                    placeholder="e.g. Vata-Pitta"
+                    value={editFields.prakriti}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        prakriti: e.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    label="Vikriti (current imbalance)"
+                    placeholder="e.g. Pitta aggravation"
+                    value={editFields.vikriti}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        vikriti: e.target.value,
+                      }))
+                    }
+                  />
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Agni (digestive fire)
+                    </div>
+                    <Select
+                      options={agniOptions}
+                      value={editFields.agni}
+                      onChange={(val) =>
+                        setEditFields((prev) => ({ ...prev, agni: val }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Appetite
+                    </div>
+                    <Select
+                      options={appetiteOptions}
+                      value={editFields.appetite}
+                      onChange={(val) =>
+                        setEditFields((prev) => ({ ...prev, appetite: val }))
+                      }
+                    />
+                  </div>
+                  <Input
+                    label="Bowel habits"
+                    placeholder="Regular / constipated / loose / alternate…"
+                    value={editFields.bowelHabits}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        bowelHabits: e.target.value,
+                      }))
+                    }
+                  />
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Sleep quality
+                    </div>
+                    <Select
+                      options={sleepOptions}
+                      value={editFields.sleepQuality}
+                      onChange={(val) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          sleepQuality: val,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
               </section>
 
-              {/* Health Profile */}
-              <section>
-                <h4 className="text-sm font-semibold text-text-primary mb-2">
-                  Health Profile
+              {/* VITALS & MEASUREMENTS */}
+              <section className="border border-border/60 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-3">
+                  Vitals & Measurements
                 </h4>
 
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                   <Input
                     label="Height (cm)"
                     type="number"
@@ -763,9 +931,6 @@ const PatientManagement = () => {
                       }));
                     }}
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-3">
                   <Input
                     label="BMI"
                     type="number"
@@ -790,7 +955,7 @@ const PatientManagement = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <Input
                     label="Heart Rate (bpm)"
                     type="number"
@@ -803,8 +968,8 @@ const PatientManagement = () => {
                     }
                   />
                   <Input
-                    label="Diet Preferences"
-                    placeholder="Veg / Non-veg / Satvik…"
+                    label="Diet preference"
+                    placeholder="Veg / Non-veg / Satvik / Jain…"
                     value={editFields.dietPreferences}
                     onChange={(e) =>
                       setEditFields((prev) => ({
@@ -813,35 +978,122 @@ const PatientManagement = () => {
                       }))
                     }
                   />
-                </div>
-
-                {[
-                  ["Allergies", "allergies"],
-                  ["Medications", "medications"],
-                  ["Chronic Conditions", "chronicConditions"],
-                  ["Lifestyle Notes", "lifestyleNotes"],
-                ].map(([label, key]) => (
-                  <div className="mb-3" key={key}>
+                  <div>
                     <div className="text-xs font-medium text-text-secondary mb-1">
-                      {label}
+                      Physical activity
                     </div>
-                    <textarea
-                      className="w-full border border-border rounded-md p-2 text-sm"
-                      rows={key === "lifestyleNotes" ? 3 : 2}
-                      value={editFields[key]}
-                      onChange={(e) =>
+                    <Select
+                      options={exerciseOptions}
+                      value={editFields.exercisePattern}
+                      onChange={(val) =>
                         setEditFields((prev) => ({
                           ...prev,
-                          [key]: e.target.value,
+                          exercisePattern: val,
                         }))
                       }
                     />
                   </div>
-                ))}
+                </div>
+              </section>
+
+              {/* LIFESTYLE & HISTORY */}
+              <section className="border border-border/60 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-3">
+                  History, Allergies & Lifestyle
+                </h4>
+
+                <div className="grid md:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Allergies
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={2}
+                      placeholder="Drug / food / environmental allergies…"
+                      value={editFields.allergies}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          allergies: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Current medications / supplements
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={2}
+                      value={editFields.medications}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          medications: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Past / chronic conditions
+                    </div>
+                    <textarea
+                      className="w-full border border-border rounded-md p-2 text-sm"
+                      rows={2}
+                      value={editFields.chronicConditions}
+                      onChange={(e) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          chronicConditions: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-text-secondary mb-1">
+                      Stress level
+                    </div>
+                    <Select
+                      options={stressOptions}
+                      value={editFields.stressLevel}
+                      onChange={(val) =>
+                        setEditFields((prev) => ({
+                          ...prev,
+                          stressLevel: val,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-medium text-text-secondary mb-1">
+                    Daily routine, occupation, emotional notes, addictions,
+                    other lifestyle factors
+                  </div>
+                  <textarea
+                    className="w-full border border-border rounded-md p-2 text-sm"
+                    rows={3}
+                    placeholder="Briefly capture dinacharya (daily routine), raatricharya (sleep), work nature, addictions, stressors, family support etc."
+                    value={editFields.lifestyleNotes}
+                    onChange={(e) =>
+                      setEditFields((prev) => ({
+                        ...prev,
+                        lifestyleNotes: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
               </section>
 
               {/* Clinical Reports */}
-              <section className="mt-2 border-t border-border pt-4">
+              <section className="mt-2 border border-border/60 rounded-xl p-4">
                 <h4 className="text-sm font-semibold text-text-primary mb-2">
                   Clinical Reports & Doctor Notes
                 </h4>
@@ -1004,55 +1256,49 @@ const PatientManagement = () => {
                 </div>
               </section>
 
-              {/* Next Appointment */}
-              <section>
-                <h4 className="text-sm font-semibold text-text-primary mb-1">
-                  Next Appointment
-                </h4>
-                <Input
-                  type="datetime-local"
-                  value={editFields.nextAppointment}
-                  onChange={(e) =>
-                    setEditFields({
-                      ...editFields,
-                      nextAppointment: e.target.value,
-                    })
-                  }
-                />
-              </section>
+              {/* Next Appointment + Diet Plan */}
+              <section className="border border-border/60 rounded-xl p-4">
+                <div className="grid md:grid-cols-2 gap-4 items-end">
+                  <div>
+                    <h4 className="text-sm font-semibold text-text-primary mb-1">
+                      Next Appointment
+                    </h4>
+                    <Input
+                      type="datetime-local"
+                      value={editFields.nextAppointment}
+                      onChange={(e) =>
+                        setEditFields({
+                          ...editFields,
+                          nextAppointment: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
 
-              {/* Diet Plan */}
-              <section className="mt-4 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-text-primary mb-2">
-                  Diet Plan
-                </h4>
-                <p className="text-xs text-text-secondary mb-3">
-                  Open the full-screen diet planner to design or edit this
-                  patient's meal plan.
-                </p>
+                  <div className="mt-4 md:mt-0">
+                    <h4 className="text-sm font-semibold text-text-primary mb-2">
+                      Diet Plan
+                    </h4>
+                    <p className="text-xs text-text-secondary mb-3">
+                      Open the full-screen diet planner to design or edit this
+                      patient's meal plan.
+                    </p>
 
-                <Button
-                  variant="default"
-                  className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
-                  onClick={() => {
-                    navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
-                      state: {
-                        patientName: selectedPatient.name,
-                      },
-                    });
-                  }}
-                >
-                  Open Diet Planner
-                </Button>
-               <WeeklyPlanSummaryCard
-    clinicalPatientId={selectedPatient._id}
-    onOpenPlanner={() =>
-      navigate(`/doctor/week-planner/${selectedPatient._id}`, {
-        state: { patientName: selectedPatient.name },
-      })
-    }
-  />
-
+                    <Button
+                      variant="default"
+                      className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
+                      onClick={() => {
+                        navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
+                          state: {
+                            patientName: selectedPatient.name,
+                          },
+                        });
+                      }}
+                    >
+                      Open Diet Planner
+                    </Button>
+                  </div>
+                </div>
               </section>
             </div>
 

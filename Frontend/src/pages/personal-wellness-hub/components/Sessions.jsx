@@ -3,9 +3,6 @@ import axios from "axios";
 import BookingModal from "./BookingModal";
 import useAuth from "../../../hooks/useAuth";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
-
 const SessionCard = ({ title, price, desc, selected, onClick }) => (
   <div
     onClick={onClick}
@@ -27,8 +24,6 @@ const SessionCard = ({ title, price, desc, selected, onClick }) => (
 );
 
 const Sessions = () => {
-  const { user, token } = useAuth();
-
   const [selected, setSelected] = useState("Initial Consultation");
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -38,8 +33,12 @@ const Sessions = () => {
   const [time, setTime] = useState("");
 
   const [appointments, setAppointments] = useState([]);
+
+  // ✅ FIX: Default tab always "book"
   const [activeTab, setActiveTab] = useState("book");
-  const [loading, setLoading] = useState(false);
+
+  const { user } = useAuth();
+  const patientId = user?._id || user?.id || localStorage.getItem("patientId");
 
   const types = [
     {
@@ -59,56 +58,27 @@ const Sessions = () => {
     },
   ];
 
-
-const formatDate = (val) => {
-  if (!val) return "";
-
-  // If already ISO format, keep it as is
-  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-
-  // Otherwise assume DD-MM-YYYY
-  const [dd, mm, yyyy] = val.split("-");
-  return `${yyyy}-${mm}-${dd}`;
-};
-
-  // Helper: axios instance with auth header
-  const api = axios.create({
-    baseURL: API_BASE,
-    headers: token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {},
-  });
+  const formatDate = (d) => {
+    if (!d.includes("-")) return d;
+    const [day, month, year] = d.split("-");
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
-    if (!token) return;
+    // Fetch Doctors
+    axios
+      .get("http://localhost:9000/api/doctors")
+      .then((res) => setDoctors(res.data))
+      .catch((err) => console.error("Error loading doctors:", err));
 
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-
-        // 1) Fetch doctors (you must have /api/doctors defined on backend)
-        const resDocs = await api.get("/api/doctors");
-        setDoctors(resDocs.data || []);
-
-        // 2) Fetch appointments for logged-in patient
-        const patientId = user?.id;
-        if (patientId) {
-          const resApt = await api.get(
-            `/api/appointments/patient/${patientId}`
-          );
-          setAppointments(resApt.data.appointments || []);
-        }
-      } catch (err) {
-        console.error("Error loading sessions data:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [token, user?.id]);
+    // Fetch Appointments
+    if (patientId) {
+      axios
+        .get(`http://localhost:9000/api/appointments/patient/${patientId}`)
+        .then((res) => setAppointments(res.data.appointments || []))
+        .catch((err) => console.error("Error fetching appointments:", err));
+    }
+  }, [patientId]);
 
   const handleBookClick = (doc) => {
     setSelectedDoctor(doc);
@@ -117,21 +87,9 @@ const formatDate = (val) => {
 
   const handleConfirmBooking = async () => {
     try {
-      const patientId = user?.id;
-      if (!patientId) {
-        alert("Patient ID missing. Please login again.");
-        return;
-      }
-      if (!selectedDoctor) {
-        alert("Select a doctor first.");
-        return;
-      }
-      if (!date || !time) {
-        alert("Please select date and time.");
-        return;
-      }
+      if (!patientId) return alert("Patient ID missing. Please login again.");
 
-      await api.post("/api/appointments", {
+      await axios.post("http://localhost:9000/api/appointments", {
         patientId,
         doctorId: selectedDoctor._id,
         sessionType: selected,
@@ -139,30 +97,21 @@ const formatDate = (val) => {
         time,
       });
 
-      alert("Appointment booked successfully!");
+      alert("Appointment Booked Successfully!");
       setShowModal(false);
       setDate("");
       setTime("");
       setSelectedDoctor(null);
 
-      // Refresh appointments
-      const res = await api.get(`/api/appointments/patient/${patientId}`);
+      const res = await axios.get(
+        `http://localhost:9000/api/appointments/patient/${patientId}`
+      );
       setAppointments(res.data.appointments || []);
     } catch (err) {
       console.error("BOOKING ERROR:", err);
-      const msg =
-        err?.response?.data?.message ||
-        "Error booking appointment. Please try again.";
-      alert(msg);
+      alert("Error booking appointment");
     }
   };
-
-  const upcomingAppointments = appointments.filter(
-    (apt) => apt.status !== "completed" && apt.status !== "cancelled"
-  );
-  const pastAppointments = appointments.filter(
-    (apt) => apt.status === "completed" || apt.status === "cancelled"
-  );
 
   return (
     <>
@@ -212,12 +161,11 @@ const formatDate = (val) => {
               </ul>
             </div>
 
-            {loading && (
-              <p className="text-sm text-gray-500">Loading…</p>
-            )}
+            {/* FORCE DEFAULT TAB FIX */}
+            {!activeTab && setActiveTab("book")}
 
             {/* TAB 1 — BOOK SESSION */}
-            {!loading && activeTab === "book" && (
+            {activeTab === "book" && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 mb-8">
                   {types.map((t) => (
@@ -232,11 +180,10 @@ const formatDate = (val) => {
                   ))}
                 </div>
 
+                {/* SHOW DOCTORS LIST */}
                 <div className="mt-4 space-y-4">
                   {doctors.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      No doctors available yet.
-                    </p>
+                    <p className="text-gray-500">No doctors available.</p>
                   ) : (
                     doctors.map((doc) => (
                       <div
@@ -244,16 +191,9 @@ const formatDate = (val) => {
                         className="p-5 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
                       >
                         <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="text-lg font-semibold">
-                              {doc.fullName}
-                            </h3>
-                            {doc.specialization && (
-                              <p className="text-xs text-gray-500">
-                                {doc.specialization}
-                              </p>
-                            )}
-                          </div>
+                          <h3 className="text-lg font-semibold">
+                            {doc.fullName}
+                          </h3>
 
                           {doc.verified && (
                             <span className="text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full text-xs font-medium">
@@ -278,71 +218,57 @@ const formatDate = (val) => {
             )}
 
             {/* TAB 2 — SCHEDULED SESSIONS */}
-            {!loading && activeTab === "scheduled" && (
+            {activeTab === "scheduled" && (
               <div className="mt-4 space-y-4">
-                {upcomingAppointments.length === 0 ? (
+                {appointments.length === 0 ? (
                   <p className="text-gray-500">No scheduled sessions.</p>
                 ) : (
-                  upcomingAppointments.map((apt) => (
+                  appointments.map((apt) => (
                     <div
                       key={apt._id}
-                      className="p-5 border rounded-xl shadow-sm bg-emerald-50"
+                      className="p-5 border rounded-xl shadow-sm bg-emerald-50 flex justify-between items-start"
                     >
-                      <h3 className="font-semibold text-lg">
-                        {apt.sessionType}
-                      </h3>
+                      <div>
+                        <h3 className="font-semibold text-lg">
+                          {apt.sessionType}
+                        </h3>
 
-                      <p className="text-gray-700 mt-1">
-                        Doctor: {apt.doctorId?.fullName}
-                      </p>
+                        <p className="text-gray-700 mt-1">
+                          Doctor: {apt.doctorId?.fullName}
+                        </p>
 
-                      <p className="text-gray-600 mt-1">
-                        Date: {apt.date} • Time: {apt.time}
-                      </p>
+                        <p className="text-gray-600 mt-1">
+                          Date: {apt.date} • Time: {apt.time}
+                        </p>
 
-                      <span className="text-sm text-emerald-700 font-medium">
-                        Status: {apt.status}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+                        <span className="text-sm text-emerald-700 font-medium">
+                          Status: {apt.status}
+                        </span>
+                      </div>
 
-            {/* TAB 3 — HISTORY */}
-            {!loading && activeTab === "history" && (
-              <div className="mt-4 space-y-4">
-                {pastAppointments.length === 0 ? (
-                  <p className="text-gray-500">
-                    No past sessions recorded yet.
-                  </p>
-                ) : (
-                  pastAppointments.map((apt) => (
-                    <div
-                      key={apt._id}
-                      className="p-5 border rounded-xl shadow-sm bg-gray-50"
-                    >
-                      <h3 className="font-semibold text-lg">
-                        {apt.sessionType}
-                      </h3>
+                      <button
+                        onClick={async () => {
+                          const ok = window.confirm("Delete appointment?");
+                          if (!ok) return;
 
-                      <p className="text-gray-700 mt-1">
-                        Doctor: {apt.doctorId?.fullName}
-                      </p>
+                          try {
+                            await axios.delete(
+                              `http://localhost:9000/api/appointments/${apt._id}`
+                            );
 
-                      <p className="text-gray-600 mt-1">
-                        Date: {apt.date} • Time: {apt.time}
-                      </p>
-
-                      <span
-                        className={`text-sm font-medium ${
-                          apt.status === "completed"
-                            ? "text-emerald-700"
-                            : "text-red-600"
-                        }`}
+                            const res = await axios.get(
+                              `http://localhost:9000/api/appointments/patient/${patientId}`
+                            );
+                            setAppointments(res.data.appointments || []);
+                          } catch (err) {
+                            console.error("DELETE ERROR:", err);
+                            alert("Failed to delete appointment");
+                          }
+                        }}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition"
                       >
-                        Status: {apt.status}
-                      </span>
+                        Delete
+                      </button>
                     </div>
                   ))
                 )}
@@ -352,7 +278,6 @@ const formatDate = (val) => {
         </div>
       </section>
 
-      {/* Booking Modal */}
       {showModal && (
         <BookingModal
           doctor={selectedDoctor}

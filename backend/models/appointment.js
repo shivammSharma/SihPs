@@ -20,20 +20,21 @@ const appointmentSchema = new mongoose.Schema(
     },
 
     date: {
-      type: Date,     // FIXED: always store real Date
+      type: String, // frontend sends "DD-MM-YYYY"
       required: true,
     },
 
     time: {
-      type: String,   // keep HH:mm
+      type: String, // frontend sends "HH:mm"
       required: true,
     },
 
     status: {
-      type: String,
-      enum: ["Scheduled", "Completed", "Cancelled"],
-      default: "Scheduled",
-    },
+  type: String,
+  enum: ["Scheduled", "Accepted", "Rejected", "Completed"],
+  default: "Scheduled",
+},
+
   },
   { timestamps: true }
 );
