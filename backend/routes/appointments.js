@@ -1,83 +1,121 @@
 // backend/routes/appointments.js
 import express from "express";
 import Appointment from "../models/appointment.js";
-import Patient from "../models/Patient.js";
+import Patient from "../models/Patient.js";            // AUTH patient (signup/login)
 import Doctor from "../models/doctor.js";
+import ClinicalPatient from "../models/ClinicalPatient.js"; // CLINICAL panel
 import { verifyToken, requireDoctor } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-/* =========================================================
-   CREATE NEW APPOINTMENT  (PATIENT → BOOK SESSION)
+/**
+ * Helper: build a JS Date from "YYYY-MM-DD" + "HH:mm"
+ * (used to keep ClinicalPatient.nextAppointment in sync)
+ */
+function buildNextAppointmentDate(dateStr, timeStr) {
+  if (!dateStr) return null;
+  const date = String(dateStr).slice(0, 10); // YYYY-MM-DD
+  const time = (timeStr && timeStr.trim() !== "") ? timeStr : "00:00";
+  const iso = `${date}T${time}:00`;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+/* -----------------------------------
+   CREATE NEW APPOINTMENT (PATIENT BOOKING)
    POST /api/appointments
-   ========================================================= */
+   ----------------------------------- */
 router.post("/", async (req, res) => {
   try {
+    const { patientId, doctorId, sessionType, date, time } = req.body;
+
     console.log("=== BOOK APPOINTMENT DEBUG ===");
     console.log("Incoming body:", req.body);
 
-    const { patientId, doctorId, sessionType, date, time } = req.body || {};
-
-    // 1) Basic required fields
     if (!patientId || !doctorId || !sessionType || !date || !time) {
-      console.log("Missing fields:", {
-        patientId,
-        doctorId,
-        sessionType,
-        date,
-        time,
-      });
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "All fields are required" });
     }
 
-    // 2) Ensure PATIENT exists
-    const patientExists = await Patient.findById(patientId);
-    if (!patientExists) {
-      console.log("[APPOINTMENTS] ERROR: Patient not found:", patientId);
-      return res.status(404).json({
-        success: false,
-        message: "Patient not found",
-      });
+    // 1) Ensure AUTH patient account exists
+    const patientAccount = await Patient.findById(patientId);
+    if (!patientAccount) {
+      console.warn("[APPOINTMENTS] Patient account not found:", patientId);
+      return res
+        .status(404)
+        .json({ success: false, message: "Patient account not found" });
     }
 
-    // 3) Ensure DOCTOR exists
+    // 2) Ensure doctor exists
     const doctorExists = await Doctor.findById(doctorId);
     if (!doctorExists) {
-      console.log("[APPOINTMENTS] ERROR: Doctor not found:", doctorId);
-      return res.status(404).json({
-        success: false,
-        message: "Doctor not found",
-      });
+      console.warn("[APPOINTMENTS] Doctor not found:", doctorId);
+      return res
+        .status(404)
+        .json({ success: false, message: "Doctor not found" });
     }
 
-    // 4) Prevent double-booking same doctor, same slot
+    // 3) Prevent double-booking same doctor, same slot
     const existing = await Appointment.findOne({ doctorId, date, time });
     if (existing) {
-      console.log("[APPOINTMENTS] ERROR: Slot already booked:", {
-        doctorId,
-        date,
-        time,
-      });
       return res.status(409).json({
         success: false,
         message: "This slot is already booked. Choose another time.",
       });
     }
 
-    // 5) Create appointment
+    // 4) Create the appointment record
     const newAppointment = await Appointment.create({
-      patientId,
+      patientId,           // AUTH patient id
       doctorId,
       sessionType,
-      date, // stored as string (e.g. "2025-12-05" or "05-12-2025")
-      time, // stored as "HH:mm"
+      date,                // "YYYY-MM-DD"
+      time,                // "HH:mm"
       status: "Scheduled",
     });
 
     console.log("[APPOINTMENTS] CREATED:", newAppointment._id);
+
+    // 5) 🔥 AUTO-CREATE / UPDATE CLINICAL PATIENT (for PatientManagement)
+    const nextApptDate = buildNextAppointmentDate(date, time);
+
+    // Find an existing ClinicalPatient row for this doctor + auth patient
+    let clinical = await ClinicalPatient.findOne({
+      doctorId,
+      patientAccountId: patientAccount._id,
+    });
+
+    if (!clinical) {
+      console.log(
+        "[APPOINTMENTS] No clinical record found. Creating new ClinicalPatient for doctor panel."
+      );
+
+      clinical = await ClinicalPatient.create({
+        doctorId,
+        patientAccountId: patientAccount._id,
+
+        // basic visible fields on doctor side
+        name: patientAccount.fullName || "Patient",
+        age: patientAccount.age ?? null,
+        dosha: "", // doctor can set later
+        condition: sessionType, // initial reason
+        status: "active",
+        lastVisit: null,
+        nextAppointment: nextApptDate,
+        progress: 0,
+      });
+    } else {
+      console.log(
+        "[APPOINTMENTS] Updating existing ClinicalPatient.nextAppointment"
+      );
+      clinical.nextAppointment = nextApptDate;
+      if (!clinical.status || clinical.status === "new") {
+        clinical.status = "active";
+      }
+      await clinical.save();
+    }
 
     return res.json({
       success: true,
@@ -85,24 +123,19 @@ router.post("/", async (req, res) => {
       appointment: newAppointment,
     });
   } catch (err) {
-    console.error("ERROR CREATING APPOINTMENT:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: err.message,
-    });
+    console.error("Appointment Error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-/* =========================================================
+/* -----------------------------------
    GET APPOINTMENTS BY PATIENT ID
    GET /api/appointments/patient/:id
-   (used by Sessions → "Scheduled Sessions" tab)
-   ========================================================= */
+   (used by Sessions tab: "Scheduled")
+   ----------------------------------- */
 router.get("/patient/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
     console.log("[APPOINTMENTS] Fetch by patient:", id);
 
     const appointments = await Appointment.find({ patientId: id })
@@ -114,22 +147,19 @@ router.get("/patient/:id", async (req, res) => {
       appointments,
     });
   } catch (err) {
-    console.error("Fetch appointments (patient) error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    console.error("Fetch appointments error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-/* =========================================================
+/* -----------------------------------
    GET APPOINTMENTS FOR LOGGED-IN DOCTOR
    GET /api/appointments/doctor/me
-   (used by Doctor DashboardOverview)
-   ========================================================= */
+   (used by DoctorAppointmentsWidget + DashboardOverview)
+   ----------------------------------- */
 router.get("/doctor/me", verifyToken, requireDoctor, async (req, res) => {
-  try{
-    const doctorId = req.user.id; // from JWT payload
+  try {
+    const doctorId = req.user.id; // from JWT
     console.log("[APPOINTMENTS] Fetch for doctor:", doctorId);
 
     const appointments = await Appointment.find({ doctorId })
@@ -142,23 +172,19 @@ router.get("/doctor/me", verifyToken, requireDoctor, async (req, res) => {
     });
   } catch (err) {
     console.error("Fetch doctor appointments error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-/* =========================================================
-   UPDATE APPOINTMENT STATUS (Doctor only)
+/* -----------------------------------
+   UPDATE STATUS (doctor)
    PATCH /api/appointments/:id/status
-   body: { status: "Scheduled" | "Completed" | "Cancelled" }
-   ========================================================= */
+   ----------------------------------- */
 router.patch("/:id/status", verifyToken, requireDoctor, async (req, res) => {
   try {
     const doctorId = req.user.id;
     const { id } = req.params;
-    const { status } = req.body || {};
+    const { status } = req.body;
 
     const allowed = ["Scheduled", "Completed", "Cancelled"];
     if (!allowed.includes(status)) {
@@ -180,15 +206,6 @@ router.patch("/:id/status", verifyToken, requireDoctor, async (req, res) => {
         message: "Appointment not found for this doctor",
       });
     }
-
-    console.log(
-      "[APPOINTMENTS] Status updated:",
-      id,
-      "->",
-      status,
-      "by doctor",
-      doctorId
-    );
 
     return res.json({
       success: true,

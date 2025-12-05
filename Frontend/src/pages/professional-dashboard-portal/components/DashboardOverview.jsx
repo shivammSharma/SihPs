@@ -386,7 +386,12 @@ const DashboardOverview = () => {
           {error}
         </div>
       )}
-      <DoctorAppointmentsWidget />
+      <DoctorAppointmentsWidget
+  appointments={appointments}
+  setAppointments={setAppointments}
+  loading={loading}
+/>
+
     </div>
   );
 };

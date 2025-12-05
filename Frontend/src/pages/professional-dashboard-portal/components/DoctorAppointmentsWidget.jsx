@@ -15,6 +15,13 @@ const DoctorAppointmentsWidget = () => {
   const [filter, setFilter] = useState("today"); // "today" | "upcoming" | "all"
   const [updatingId, setUpdatingId] = useState(null);
 
+  // Reschedule modal state
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [activeAppointment, setActiveAppointment] = useState(null);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+  const [rescheduleError, setRescheduleError] = useState("");
+
   const api = axios.create({
     baseURL: API_BASE,
     headers: {
@@ -25,19 +32,17 @@ const DoctorAppointmentsWidget = () => {
   // Normalize any date value to "YYYY-MM-DD"
   const normalizeDate = (val) => {
     if (!val) return "";
-    // If it's a Date object
     if (val instanceof Date) {
       const y = val.getFullYear();
       const m = String(val.getMonth() + 1).padStart(2, "0");
       const d = String(val.getDate()).padStart(2, "0");
       return `${y}-${m}-${d}`;
     }
-    // If it's already a string (e.g. "2025-12-05" or "2025-12-05T00:00:00.000Z")
     const str = String(val);
-    return str.slice(0, 10); // "YYYY-MM-DD"
+    return str.slice(0, 10); // handles "2025-12-05" or "2025-12-05T..."
   };
 
-  // Today as "YYYY-MM-DD" in local time
+  // Today as "YYYY-MM-DD"
   const getTodayString = () => {
     const now = new Date();
     const y = now.getFullYear();
@@ -48,7 +53,7 @@ const DoctorAppointmentsWidget = () => {
 
   const todayStr = getTodayString();
 
-  // Fetch doctor's appointments
+  // Fetch doctor's appointments once
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
@@ -66,7 +71,9 @@ const DoctorAppointmentsWidget = () => {
           },
         });
 
-        setAppointments(res.data?.appointments || []);
+        const list = res.data?.appointments || [];
+        console.log("[DoctorAppointmentsWidget] fetched:", list);
+        setAppointments(list);
       } catch (err) {
         console.error("DoctorAppointmentsWidget load error:", err);
         const msg =
@@ -84,37 +91,30 @@ const DoctorAppointmentsWidget = () => {
   }, [token]);
 
   const filteredAppointments = useMemo(() => {
-    // 1. Attach normalized date to each
-    const withNorm = appointments.map((apt) => {
+    const withNorm = (appointments || []).map((apt) => {
       const normDate = normalizeDate(apt.date);
       return { ...apt, _normDate: normDate };
     });
 
-    // 2. Filter based on selected tab
     const filtered = withNorm.filter((apt) => {
       const d = apt._normDate;
 
       if (!d) {
-        // If date is missing and filter is strict, hide it
         if (filter === "today" || filter === "upcoming") return false;
         return true; // "all"
       }
 
       if (filter === "today") {
-        // SIMPLE: same string as today
         return d === todayStr;
       }
 
       if (filter === "upcoming") {
-        // All appointments from today onward
         return d >= todayStr;
       }
 
-      // "all"
       return true;
     });
 
-    // 3. Sort by (date, time) as strings
     filtered.sort((a, b) => {
       const da = a._normDate || "";
       const db = b._normDate || "";
@@ -145,7 +145,9 @@ const DoctorAppointmentsWidget = () => {
       const updated = res.data?.appointment;
       if (updated) {
         setAppointments((prev) =>
-          prev.map((apt) => (apt._id === id ? updated : apt))
+          (prev || []).map((apt) =>
+            apt._id === updated._id ? updated : apt
+          )
         );
       }
     } catch (err) {
@@ -155,6 +157,65 @@ const DoctorAppointmentsWidget = () => {
         err?.response?.data?.error ||
         "Failed to update status";
       setError(msg);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Open reschedule modal for an appointment
+  const openReschedule = (apt) => {
+    setActiveAppointment(apt);
+    setNewDate(normalizeDate(apt.date)); // pre-fill
+    setNewTime(apt.time || "");
+    setRescheduleError("");
+    setRescheduleOpen(true);
+  };
+
+  const closeReschedule = () => {
+    setRescheduleOpen(false);
+    setActiveAppointment(null);
+    setNewDate("");
+    setNewTime("");
+    setRescheduleError("");
+  };
+
+  const handleRescheduleSubmit = async (e) => {
+    e?.preventDefault();
+    if (!activeAppointment) return;
+
+    try {
+      setUpdatingId(activeAppointment._id);
+      setRescheduleError("");
+
+      const res = await api.patch(
+        `/api/appointments/${activeAppointment._id}/reschedule`,
+        { date: newDate, time: newTime },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const updated = res.data?.appointment;
+      if (!updated) {
+        throw new Error("No updated appointment returned");
+      }
+
+      setAppointments((prev) =>
+        (prev || []).map((apt) =>
+          apt._id === updated._id ? updated : apt
+        )
+      );
+
+      closeReschedule();
+    } catch (err) {
+      console.error("Reschedule error:", err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to reschedule appointment";
+      setRescheduleError(msg);
     } finally {
       setUpdatingId(null);
     }
@@ -232,7 +293,7 @@ const DoctorAppointmentsWidget = () => {
             return (
               <div
                 key={apt._id}
-                className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border hover:border-primary/70 organic-transition"
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-3 bg-muted/30 rounded-lg border border-border hover:border-primary/70 organic-transition"
               >
                 <div className="flex flex-col">
                   <span className="font-medium text-text-primary">
@@ -247,21 +308,31 @@ const DoctorAppointmentsWidget = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-text-secondary">
-                    Status:
-                  </span>
-                  <select
-                    className="text-xs border border-border rounded-md px-2 py-1 bg-background"
-                    value={status}
-                    disabled={updatingId === apt._id}
-                    onChange={(e) =>
-                      handleStatusChange(apt._id, e.target.value)
-                    }
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary">
+                      Status:
+                    </span>
+                    <select
+                      className="text-xs border border-border rounded-md px-2 py-1 bg-background"
+                      value={status}
+                      disabled={updatingId === apt._id}
+                      onChange={(e) =>
+                        handleStatusChange(apt._id, e.target.value)
+                      }
+                    >
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="text-xs px-3 py-1 rounded-md border border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                    onClick={() => openReschedule(apt)}
                   >
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
+                    Reschedule
+                  </button>
                 </div>
               </div>
             );
@@ -273,8 +344,91 @@ const DoctorAppointmentsWidget = () => {
           </div>
         )}
       </div>
+
+      {/* RESCHEDULE MODAL */}
+      {rescheduleOpen && activeAppointment && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-gray-800">
+                Reschedule Appointment
+              </h4>
+              <button
+                type="button"
+                className="text-gray-500 hover:text-gray-800 text-lg"
+                onClick={closeReschedule}
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              {activeAppointment.patientId?.fullName ||
+                activeAppointment.patientId?.name ||
+                "Patient"}{" "}
+              · {activeAppointment.sessionType}
+            </p>
+
+            <form onSubmit={handleRescheduleSubmit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  New Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  New Time
+                </label>
+                <input
+                  type="time"
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="text-xs px-3 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  onClick={closeReschedule}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    updatingId === activeAppointment._id || loading
+                  }
+                  className="text-xs px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {updatingId === activeAppointment._id
+                    ? "Saving..."
+                    : "Save changes"}
+                </button>
+              </div>
+            </form>
+
+            {rescheduleError && (
+              <div className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                {rescheduleError}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default DoctorAppointmentsWidget;
+  
