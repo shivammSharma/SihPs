@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
-import Icon from "../../../components/AppIcon";
+import React, { useEffect, useState, useRef } from "react";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import useAuth from "../../../hooks/useAuth";
+import { io } from "socket.io-client";
 
 const API_BASE = "http://localhost:9000";
+const socket = io(API_BASE);
 
 const CommunicationTools = () => {
   const { user } = useAuth(); // doctor
@@ -16,33 +17,131 @@ const CommunicationTools = () => {
   const [messages, setMessages] = useState([]);
   const [loadingConvos, setLoadingConvos] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [error, setError] = useState("");
+  const [isPatientTyping, setIsPatientTyping] = useState(false);
 
-  /* -------------------------------------------------------
-     1) FETCH DOCTOR’S CONVERSATIONS
-  ------------------------------------------------------- */
+  const chatBoxRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // ⭐ context menu
+  const [contextMenu, setContextMenu] = useState(null);
+
+  // ------------------ helpers ------------------ //
+  const scrollToBottom = () => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  };
+
+  // Mark given messages as "seen" (patient → doctor messages)
+  const markMessagesSeen = (msgs) => {
+    if (!selectedConversation || !Array.isArray(msgs) || msgs.length === 0) return;
+
+    const patientId = selectedConversation.patientId;
+
+    // only messages sent BY PATIENT and not already seen
+    const unseenFromPatient = msgs.filter((m) => {
+      const fromPatient = m.senderRole === "patient";
+      const notSeen = m.status !== "seen";
+      const hasId = !!(m._id || m.id);
+      return fromPatient && notSeen && hasId;
+    });
+
+    if (unseenFromPatient.length === 0) return;
+
+    const messageIds = unseenFromPatient.map((m) => m._id || m.id);
+
+    socket.emit("message-seen", {
+      messageIds,
+      viewerId: user.id, // doctor who saw
+      otherUserId: patientId, // patient who sent
+    });
+  };
+
+  // ------------------ SOCKET INIT ------------------ //
+  useEffect(() => {
+    socket.emit("user-online", { userId: user.id, role: "doctor" });
+
+    const handleReceiveMessage = (msg) => {
+      // only append if doctor is currently in that conversation
+      if (
+        selectedConversation &&
+        msg.patientId === selectedConversation.patientId &&
+        msg.doctorId === user.id
+      ) {
+        setMessages((prev) => [...prev, msg]);
+        scrollToBottom();
+
+        // doctor sees it immediately → mark as seen
+        markMessagesSeen([msg]);
+      }
+    };
+
+    const handleTyping = () => {
+      setIsPatientTyping(true);
+      setTimeout(() => setIsPatientTyping(false), 1500);
+    };
+
+    const handleStatusUpdate = ({ messageId, messageIds, status }) => {
+      // this event comes to SENDER (doctor when doctor sends messages)
+      setMessages((prev) =>
+        prev.map((m) => {
+          const id = m._id || m.id;
+          if (messageId && id === messageId) {
+            return { ...m, status };
+          }
+          if (Array.isArray(messageIds) && messageIds.includes(id)) {
+            return { ...m, status };
+          }
+          return m;
+        })
+      );
+    };
+
+    socket.on("receive-message", handleReceiveMessage);
+    socket.on("typing", handleTyping);
+    socket.on("message-status-update", handleStatusUpdate);
+
+    return () => {
+      socket.off("receive-message", handleReceiveMessage);
+      socket.off("typing", handleTyping);
+      socket.off("message-status-update", handleStatusUpdate);
+    };
+  }, [selectedConversation, user.id]);
+
+  // ------------------ FETCH PATIENTS + CONVERSATIONS ------------------ //
   useEffect(() => {
     const fetchConversations = async () => {
       try {
         setLoadingConvos(true);
         const token = localStorage.getItem("authToken");
 
-        const res = await fetch(
-          `${API_BASE}/api/chat/doctor/me/conversations`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+        const patientsRes = await fetch(
+          `${API_BASE}/api/chat/doctor/all-patients`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
+        const allPatients = await patientsRes.json();
 
-        if (!res.ok) throw new Error("Failed to load conversations");
+        const convosRes = await fetch(
+          `${API_BASE}/api/chat/doctor/me/conversations`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const doctorConvos = await convosRes.json();
 
-        const data = await res.json();
-        setConversations(data);
-      } catch (err) {
-        console.error(err);
-        setError("Unable to load conversations.");
+        const merged = allPatients.map((p) => {
+          const existingConvo = doctorConvos.find((c) => c.patientId === p.id);
+          return existingConvo
+            ? existingConvo
+            : {
+                id: `new-${p.id}`,
+                patientId: p.id,
+                patient: p,
+                lastMessage: "",
+                timestamp: null,
+                unread: 0,
+              };
+        });
+
+        setConversations(merged);
       } finally {
         setLoadingConvos(false);
       }
@@ -51,9 +150,7 @@ const CommunicationTools = () => {
     fetchConversations();
   }, []);
 
-  /* -------------------------------------------------------
-     2) FETCH CHAT THREAD WHEN A PATIENT IS SELECTED
-  ------------------------------------------------------- */
+  // ------------------ LOAD THREAD ------------------ //
   useEffect(() => {
     if (!selectedConversation) return;
 
@@ -62,49 +159,36 @@ const CommunicationTools = () => {
         setLoadingMessages(true);
         const token = localStorage.getItem("authToken");
 
-        const patientId = selectedConversation.patientId;
-
         const res = await fetch(
-          `${API_BASE}/api/chat/thread?patientId=${patientId}&doctorId=${user.id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          `${API_BASE}/api/chat/thread?patientId=${selectedConversation.patientId}&doctorId=${user.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-
-        if (!res.ok) throw new Error("Failed to load messages");
 
         const data = await res.json();
         setMessages(data);
-      } catch (err) {
-        console.error(err);
-        setError("Unable to load messages.");
+        setTimeout(scrollToBottom, 100);
+
+        // doctor opened this chat → mark patient messages as seen
+        markMessagesSeen(data);
       } finally {
         setLoadingMessages(false);
       }
     };
 
     fetchMessages();
-  }, [selectedConversation]);
+  }, [selectedConversation, user.id]);
 
-  /* -------------------------------------------------------
-     3) SELECT A CONVERSATION
-  ------------------------------------------------------- */
-  const handleSelectConversation = (conversation) => {
-    setSelectedConversation(conversation);
+  // ------------------ SELECT CONVERSATION ------------------ //
+  const handleSelectConversation = (conv) => {
+    setSelectedConversation(conv);
   };
 
-  /* -------------------------------------------------------
-     4) SEND MESSAGE (Doctor → Patient)
-  ------------------------------------------------------- */
+  // ------------------ SEND TEXT ------------------ //
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
 
-    const token = localStorage.getItem("authToken");
     const patientId = selectedConversation.patientId;
 
-    // Create optimistic temporary UI message
     const optimisticMessage = {
       id: "tmp-" + Date.now(),
       doctorId: user.id,
@@ -112,12 +196,18 @@ const CommunicationTools = () => {
       senderRole: "doctor",
       text: newMessage,
       createdAt: new Date().toISOString(),
+      status: "sent", // show single tick immediately
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
+    scrollToBottom();
+    const textToSend = newMessage;
     setNewMessage("");
 
     try {
+      const token = localStorage.getItem("authToken");
+
+      // save to DB to get real _id
       const res = await fetch(`${API_BASE}/api/chat/send`, {
         method: "POST",
         headers: {
@@ -127,68 +217,183 @@ const CommunicationTools = () => {
         body: JSON.stringify({
           patientId,
           doctorId: user.id,
-          text: optimisticMessage.text,
+          text: textToSend,
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to send message");
-
       const saved = await res.json();
 
-      // Replace optimistic message with actual one
+      // replace optimistic message with saved one
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === optimisticMessage.id ? saved : msg))
+        prev.map((m) => (m.id === optimisticMessage.id ? saved : m))
       );
-    } catch (err) {
-      console.error(err);
-      setError("Failed to send message");
 
-      // Remove optimistic message if failed
-      setMessages((prev) =>
-        prev.filter((msg) => msg.id !== optimisticMessage.id)
-      );
+      // now emit via socket (includes _id)
+      socket.emit("send-message", {
+        ...saved,
+        receiverId: patientId,
+      });
+    } catch (err) {
+      console.error("Failed to send message:", err);
     }
   };
 
-  /* -------------------------------------------------------
-     5) HELPERS
-  ------------------------------------------------------- */
+  // ------------------ SEND FILE ------------------ //
+  const handleFileSend = async (file) => {
+    if (!file || !selectedConversation) return;
+    const patientId = selectedConversation.patientId;
+
+    const tempUrl = URL.createObjectURL(file);
+
+    const optimisticMessage = {
+      id: "tmp-file-" + Date.now(),
+      doctorId: user.id,
+      patientId,
+      senderRole: "doctor",
+      fileUrl: tempUrl,
+      fileType: file.type,
+      createdAt: new Date().toISOString(),
+      status: "sent",
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    scrollToBottom();
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("patientId", patientId);
+    formData.append("doctorId", user.id);
+
+    try {
+      const token = localStorage.getItem("authToken");
+
+      const res = await fetch(`${API_BASE}/api/chat/send-file`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const saved = await res.json();
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticMessage.id ? saved : m))
+      );
+
+      socket.emit("send-message", {
+        ...saved,
+        receiverId: patientId,
+      });
+    } catch (err) {
+      console.error("Failed to send file:", err);
+    }
+  };
+
+  // ------------------ DELETE FOR ME ------------------ //
+  const deleteForMe = async (msgId) => {
+    try {
+      const token = localStorage.getItem("authToken");
+
+      await fetch(`${API_BASE}/api/chat/delete-for-me/${msgId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setMessages((prev) => prev.filter((m) => (m._id || m.id) !== msgId));
+    } catch (err) {
+      console.error("delete-for-me failed", err);
+    }
+  };
+
+  // ------------------ DELETE FOR EVERYONE ------------------ //
+  const deleteForEveryone = async (msgId) => {
+    try {
+      const token = localStorage.getItem("authToken");
+
+      await fetch(`${API_BASE}/api/chat/delete-for-everyone/${msgId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m._id || m.id) === msgId
+            ? {
+                ...m,
+                text: "🚫 Message deleted",
+                fileUrl: null,
+                fileType: null,
+              }
+            : m
+        )
+      );
+    } catch (err) {
+      console.error("delete-for-everyone failed", err);
+    }
+  };
+
+  // ------------------ FILE BUBBLE ------------------ //
+  const renderFileBubble = (msg) => {
+    const isImage = msg.fileType?.startsWith("image/");
+    const isPdf = msg.fileType === "application/pdf";
+    const fileUrl = msg.fileUrl.startsWith("blob:")
+      ? msg.fileUrl
+      : `${API_BASE}${msg.fileUrl}`;
+
+    return (
+      <div className="px-3 py-2 rounded-2xl shadow-sm bg-emerald-600 text-white max-w-xs">
+        {isImage && (
+          <img src={fileUrl} className="rounded-xl max-h-48 mb-1" alt="" />
+        )}
+
+        {isPdf && (
+          <a href={fileUrl} target="_blank" rel="noreferrer">
+            📄 PDF Document
+          </a>
+        )}
+
+        <div className="text-[10px] opacity-70 mt-1 text-right">
+          {new Date(msg.createdAt).toLocaleTimeString()}
+        </div>
+      </div>
+    );
+  };
+
+  // ------------------ TICKS RENDER (doctor's messages) ------------------ //
+  const renderTicks = (status) => {
+    if (!status) return null;
+
+    if (status === "sent") {
+      return <span className="ml-1 text-[10px] text-gray-500">✓</span>;
+    }
+    if (status === "delivered") {
+      return <span className="ml-1 text-[10px] text-gray-500">✓✓</span>;
+    }
+    if (status === "seen") {
+      return <span className="ml-1 text-[10px] text-blue-500">✓✓</span>;
+    }
+    return null;
+  };
+
   const filteredConversations = conversations.filter((c) =>
     c.patient.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const formatTimestamp = (t) => {
-    const time = new Date(t);
-    return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  const formatTimestamp = (t) =>
+    t
+      ? new Date(t).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
 
-  const getStatusColor = (s) =>
-    s === "online" ? "bg-success" : "bg-muted";
-
-  const getPriorityColor = () => "border-l-primary bg-primary/5";
-
-  /* -------------------------------------------------------
-     6) UI
-  ------------------------------------------------------- */
+  // ------------------ RENDER ------------------ //
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-display font-semibold text-primary">
-            Communication Tools
-          </h2>
-          <p className="text-text-secondary">Secure messaging & coordination</p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* LEFT PANEL: LIST OF PATIENTS */}
+        {/* LEFT PANEL */}
         <div className="lg:col-span-1">
-          <div className="bg-card rounded-lg border border-border organic-shadow">
-
-            <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold">Messages</h3>
+          <div className="bg-card rounded-lg border h-96 overflow-y-auto">
+            <div className="p-4 border-b">
               <Input
                 placeholder="Search..."
                 value={searchTerm}
@@ -196,142 +401,157 @@ const CommunicationTools = () => {
               />
             </div>
 
-            <div className="max-h-96 overflow-y-auto divide-y divide-border">
-              {loadingConvos && (
-                <p className="p-3 text-sm text-text-secondary">Loading...</p>
-              )}
-
-              {filteredConversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  onClick={() => handleSelectConversation(conv)}
-                  className={`p-4 cursor-pointer border-l-4 ${getPriorityColor(
-                    conv.priority
-                  )} ${
-                    selectedConversation?.id === conv.id ? "bg-muted/40" : ""
-                  }`}
-                >
-                  <div className="flex items-start space-x-3">
-                    <div className="relative">
-                      <img
-                        src={conv.patient.avatar}
-                        className="w-10 h-10 rounded-full"
-                      />
-                      <div
-                        className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(
-                          conv.patient.status
-                        )}`}
-                      />
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="flex justify-between">
-                        <p className="font-medium">{conv.patient.name}</p>
-                        {conv.unread > 0 && (
-                          <span className="text-xs bg-primary px-2 py-1 rounded-full text-white">
-                            {conv.unread}
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-sm text-text-secondary truncate">
-                        {conv.lastMessage}
-                      </p>
-
-                      <p className="text-xs text-text-secondary">
-                        {formatTimestamp(conv.timestamp)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {!loadingConvos && filteredConversations.length === 0 && (
-                <p className="p-3 text-sm text-text-secondary">
-                  No conversations found.
-                </p>
-              )}
-            </div>
+            {filteredConversations.map((conv) => (
+              <div
+                key={conv.id}
+                onClick={() => handleSelectConversation(conv)}
+                className={`p-4 cursor-pointer ${
+                  selectedConversation?.id === conv.id ? "bg-gray-100" : ""
+                }`}
+              >
+                <p className="font-medium">{conv.patient.name}</p>
+                <p className="text-xs">{conv.lastMessage}</p>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* RIGHT PANEL: CHAT */}
-        <div className="lg:col-span-2">
+        {/* RIGHT PANEL */}
+        <div className="lg:col-span-2 bg-card rounded-lg border h-96 flex flex-col">
           {!selectedConversation ? (
-            <div className="h-96 flex justify-center items-center border rounded-lg">
-              <p>Select a patient to start chatting</p>
+            <div className="flex-1 flex justify-center items-center">
+              Select a patient to chat
             </div>
           ) : (
-            <div className="bg-card rounded-lg border border-border organic-shadow h-96 flex flex-col">
-
+            <>
               {/* HEADER */}
-              <div className="p-4 border-b border-border flex justify-between">
-                <div className="flex gap-3">
-                  <img
-                    src={selectedConversation.patient.avatar}
-                    className="w-10 h-10 rounded-full"
-                  />
-                  <div>
-                    <p className="font-semibold">
-                      {selectedConversation.patient.name}
-                    </p>
-                    <p className="text-xs text-text-secondary">
-                      {selectedConversation.patient.dosha} •{" "}
-                      {selectedConversation.patient.status}
-                    </p>
-                  </div>
-                </div>
+              <div className="p-4 border-b flex items-center gap-3">
+                <p className="font-semibold">
+                  {selectedConversation.patient.name}
+                </p>
+                {isPatientTyping && (
+                  <p className="text-xs text-emerald-600">Typing...</p>
+                )}
               </div>
 
-              {/* MESSAGES */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {loadingMessages && (
-                  <p className="text-sm text-text-secondary">Loading...</p>
-                )}
+              {/* CHAT MESSAGES */}
+              <div
+                ref={chatBoxRef}
+                className="flex-1 p-4 overflow-y-auto space-y-3"
+              >
+                {messages.map((msg) => {
+                  const isDoctor = msg.senderRole === "doctor";
+                  const align = isDoctor ? "justify-end" : "justify-start";
+                  const msgId = msg._id || msg.id;
 
-                {messages.map((msg) => (
-                  <div
-                    key={msg._id || msg.id}
-                    className={`flex ${
-                      msg.senderRole === "doctor"
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
+                  const timeStr = formatTimestamp(msg.createdAt);
+
+                  return (
                     <div
-                      className={`px-4 py-2 rounded-lg max-w-md ${
-                        msg.senderRole === "doctor"
-                          ? "bg-primary text-white"
-                          : "bg-muted"
-                      }`}
+                      key={msgId}
+                      className={`flex ${align}`}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          msg,
+                        });
+                      }}
                     >
-                      <p>{msg.text}</p>
-                      <p className="text-xs opacity-70 mt-1">
-                        {formatTimestamp(msg.createdAt)}
-                      </p>
+                      {msg.fileUrl ? (
+                        renderFileBubble(msg)
+                      ) : (
+                        <div
+                          className={`px-4 py-2 rounded-2xl max-w-md shadow-sm ${
+                            isDoctor
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-100 text-slate-900"
+                          }`}
+                        >
+                          <p className="text-sm">{msg.text}</p>
+                          <p className="text-[10px] opacity-70 mt-1 flex items-center justify-end">
+                            <span>{timeStr}</span>
+                            {isDoctor && renderTicks(msg.status)}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* INPUT BAR */}
               <div className="p-4 border-t flex gap-2">
-                <Input
-                  className="flex-1"
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                <button
+                  onClick={() => fileInputRef.current.click()}
+                  className="p-2 border rounded-lg"
+                >
+                  📎
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={(e) => handleFileSend(e.target.files[0])}
                 />
 
-                <Button onClick={handleSend} iconName="Send">
-                  Send
-                </Button>
-              </div>
+                <Input
+                  className="flex-1"
+                  placeholder="Type message..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={() =>
+                    socket.emit("typing", {
+                      receiverId: selectedConversation.patientId,
+                    })
+                  }
+                />
 
-            </div>
+                <Button onClick={handleSend}>Send</Button>
+              </div>
+            </>
           )}
         </div>
       </div>
+
+      {/* ⭐ CONTEXT MENU */}
+      {contextMenu && (
+        <div
+          className="fixed bg-white border rounded-lg shadow-lg z-50"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button
+            className="px-4 py-2 w-full text-left hover:bg-gray-100"
+            onClick={() => {
+              deleteForMe(contextMenu.msg._id || contextMenu.msg.id);
+              setContextMenu(null);
+            }}
+          >
+            🗑 Delete for Me
+          </button>
+
+          {contextMenu.msg.senderRole === "doctor" && (
+            <button
+              className="px-4 py-2 w-full text-left text-red-600 hover:bg-gray-100"
+              onClick={() => {
+                deleteForEveryone(contextMenu.msg._id || contextMenu.msg.id);
+                setContextMenu(null);
+              }}
+            >
+              ❌ Delete for Everyone
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* click outside to close */}
+      {contextMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setContextMenu(null)}
+        ></div>
+      )}
     </div>
   );
 };

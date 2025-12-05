@@ -1,380 +1,200 @@
 // src/pages/professional-dashboard-portal/components/DashboardOverview.jsx
+
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Icon from "../../../components/AppIcon";
 import useAuth from "../../../hooks/useAuth";
-import DoctorAppointmentsWidget from "./DoctorAppointmentsWidget";
+import { useNavigate } from "react-router-dom";
 
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const DashboardOverview = () => {
-  const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const api = axios.create({
     baseURL: API_BASE,
     headers: { "Content-Type": "application/json" },
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  /* ---------------------------------------------------------
+      FETCH DOCTOR'S APPOINTMENTS
+  --------------------------------------------------------- */
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
 
-        const token = localStorage.getItem("authToken");
-        if (!token) {
-          setError("Not authenticated. Please log in as a doctor.");
-          setPatients([]);
-          setAppointments([]);
-          return;
-        }
+      const token = localStorage.getItem("authToken");
+      const doctorId = user?._id || user?.id;
 
-        const [patientsRes, apptRes] = await Promise.all([
-          api.get("/api/patients", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          api.get("/api/appointments/doctor/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-
-        console.log("DEBUG /api/patients:", patientsRes.data);
-        console.log(
-          "DEBUG /api/appointments/doctor/me:",
-          apptRes.data?.appointments
-        );
-
-        setPatients(patientsRes.data || []);
-        setAppointments(apptRes.data?.appointments || []);
-      } catch (err) {
-        console.error("DashboardOverview load error", err);
-        const msg =
-          err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          "Failed to load dashboard data";
-        setError(msg);
-      } finally {
-        setLoading(false);
+      if (!token || !doctorId) {
+        setError("Not authenticated as doctor.");
+        return;
       }
-    };
 
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      const res = await api.get(`/api/appointments/doctor/${doctorId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-  // helper: parse "YYYY-MM-DD" or "DD-MM-YYYY" + "HH:mm"
-  const parseAppointmentDate = (dateStr, timeStr) => {
-    if (!dateStr) return null;
-    const parts = String(dateStr).split("-");
-    if (parts.length !== 3) return null;
-
-    let year, month, day;
-
-    if (parts[0].length === 4) {
-      // "YYYY-MM-DD"
-      [year, month, day] = parts;
-    } else {
-      // "DD-MM-YYYY"
-      [day, month, year] = parts;
+      setAppointments(res.data?.appointments || []);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load appointments");
+    } finally {
+      setLoading(false);
     }
-
-    const iso = `${year}-${month}-${day}T${timeStr || "00:00"}:00`;
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      console.warn("Invalid parsed appointment date:", { dateStr, timeStr, iso });
-      return null;
-    }
-    return d;
   };
 
-  const { todayStats, todaysAppointments, recentActivities } = useMemo(() => {
-    const now = new Date();
-    const stats = {
-      appointments: 0,
-      pendingReviews: 0,
-      progressAlerts: 0,
-      newPatients: 0,
-    };
+  useEffect(() => {
+    fetchAppointments();
+  }, [user]);
 
-    const todays = [];
-    const activities = [];
+  /* UTIL TO CHECK TODAY'S DATE */
+  const isToday = (dateString) => {
+    const today = new Date();
+    const [dd, mm, yyyy] = dateString.split("-");
+    const d = new Date(`${yyyy}-${mm}-${dd}`);
 
-    // 🔥 IMPORTANT:
-    // For now, treat "Today's Appointments" widget as
-    // "All appointments for this doctor", sorted by date/time.
-    appointments.forEach((apt) => {
-      const dt = parseAppointmentDate(apt.date, apt.time) || new Date();
+    return (
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate()
+    );
+  };
 
-      todays.push({
-        id: apt._id,
-        patient:
-          apt.patientId?.fullName ||
-          apt.patientId?.name ||
-          "Patient",
-        timeISO: dt.toISOString(),
-        timeLabel: dt.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        type: apt.sessionType || "Consultation",
-        dosha: "",
-        condition: "",
-        nextAppointmentDate: dt,
-      });
-    });
+  /* ---------------------------------------------------------
+      FILTER ONLY TODAY + PENDING APPOINTMENTS
+  --------------------------------------------------------- */
+  const todaysAppointments = useMemo(() => {
+    return appointments.filter(
+      (apt) =>
+        apt.date &&
+        isToday(apt.date) &&
+        apt.status === "Scheduled" // ONLY show not-handled appointments
+    );
+  }, [appointments]);
 
-    // sort by upcoming first
-    todays.sort((a, b) => a.nextAppointmentDate - b.nextAppointmentDate);
-    stats.appointments = todays.length;
+  /* ---------------------------------------------------------
+      ACCEPT APPOINTMENT
+  --------------------------------------------------------- */
+  const acceptAppointment = async (apt) => {
+    try {
+      const token = localStorage.getItem("authToken");
 
-    // Recent stats from clinical patients (same as before)
-    patients.forEach((p) => {
-      const createdAt = p.createdAt ? new Date(p.createdAt) : null;
-      const updatedAt = p.updatedAt ? new Date(p.updatedAt) : null;
+      const res = await api.post(
+        `/api/appointments/${apt._id}/accept`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      if (String(p.status).toLowerCase() === "followup") {
-        stats.pendingReviews += 1;
+      if (res.data.success) {
+        alert("Appointment accepted & patient added!");
+
+        // Remove from our local UI
+        setAppointments((prev) =>
+          prev.map((a) =>
+            a._id === apt._id ? { ...a, status: "Accepted" } : a
+          )
+        );
       }
+    } catch (err) {
+      console.error(err);
+      alert("Error accepting appointment");
+    }
+  };
 
-      if (typeof p.progress === "number" && p.progress < 30) {
-        stats.progressAlerts += 1;
-      }
+  /* ---------------------------------------------------------
+      REJECT APPOINTMENT
+  --------------------------------------------------------- */
+  const rejectAppointment = async (apt) => {
+    try {
+      const token = localStorage.getItem("authToken");
 
-      const daysSinceCreated = createdAt
-        ? (now - createdAt) / (1000 * 60 * 60 * 24)
-        : 999;
+      await api.post(
+        `/api/appointments/${apt._id}/reject`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      if (String(p.status).toLowerCase() === "new" || daysSinceCreated <= 7) {
-        stats.newPatients += 1;
-      }
+      alert("Appointment rejected");
 
-      if (createdAt && now - createdAt <= 1000 * 60 * 60 * 24 * 7) {
-        activities.push({
-          id: `new-${p._id || p.id}`,
-          type: "new",
-          patient: p.name,
-          action: "New patient registered",
-          timeLabel: createdAt.toLocaleString(),
-          dosha: p.dosha || "",
-          when: createdAt,
-        });
-      } else if (
-        updatedAt &&
-        (now - updatedAt) / (1000 * 60 * 60 * 24) <= 7
-      ) {
-        activities.push({
-          id: `upd-${p._id || p.id}`,
-          type: "update",
-          patient: p.name,
-          action: "Profile updated",
-          timeLabel: updatedAt.toLocaleString(),
-          dosha: p.dosha || "",
-          when: updatedAt,
-        });
-      }
-    });
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a._id === apt._id ? { ...a, status: "Rejected" } : a
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Error rejecting appointment");
+    }
+  };
 
-    activities.sort((a, b) => b.when - a.when);
-    const recentTop = activities.slice(0, 5);
-
-    console.log("DEBUG mapped todaysAppointments:", todays);
-
-    return {
-      todayStats: stats,
-      todaysAppointments: todays,
-      recentActivities: recentTop,
-    };
-  }, [patients, appointments]);
-
-  const quickStats = [
-    {
-      id: 1,
-      title: "Doctor's Appointments",
-      value: todayStats.appointments,
-      icon: "Calendar",
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-    },
-    {
-      id: 2,
-      title: "Pending Plan Reviews",
-      value: todayStats.pendingReviews,
-      icon: "FileText",
-      color: "text-warning",
-      bgColor: "bg-warning/10",
-    },
-    {
-      id: 3,
-      title: "Progress Alerts",
-      value: todayStats.progressAlerts,
-      icon: "TrendingUp",
-      color: "text-success",
-      bgColor: "bg-success/10",
-    },
-    {
-      id: 4,
-      title: "New Patients",
-      value: todayStats.newPatients,
-      icon: "UserPlus",
-      color: "text-secondary",
-      bgColor: "bg-secondary/10",
-    },
-  ];
-
-  const getDoctorDisplayName = () => {
-    const baseName = user?.fullName || user?.name || "Doctor";
-    if (/^dr\.?/i.test(baseName.trim())) return baseName;
-    return `Dr. ${baseName}`;
+  /* ---------------------------------------------------------
+      OPEN FULL PATIENT PROFILE
+  --------------------------------------------------------- */
+  const openPatientProfile = (id) => {
+    navigate(`/professional-dashboard-portal/patient/${id}`);
   };
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-2xl p-6 md:p-7 border border-border organic-shadow">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-emerald-700/80 font-semibold mb-1">
-              Dashboard Overview
-            </p>
-            <h2 className="text-2xl md:text-3xl font-display font-semibold text-primary mb-1">
-              Welcome back, {getDoctorDisplayName()}
-            </h2>
-            <p className="text-sm text-text-secondary">
-              <b>{loading ? "Loading..." : todayStats.appointments}</b>{" "}
-              total appointments linked to you.
-            </p>
-          </div>
-        </div>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-2xl p-6 border border-border">
+        <h2 className="text-2xl font-display font-semibold text-primary">
+          Welcome back, Dr. {user?.fullName}
+        </h2>
       </div>
 
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {quickStats.map((s) => (
-          <div
-            key={s.id}
-            className="p-4 rounded-xl border border-border bg-card organic-shadow-sm flex flex-col justify-between"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-text-secondary mb-1">
-                  {s.title}
-                </div>
-                <div className="text-2xl font-semibold">{s.value ?? 0}</div>
-              </div>
-              <div className={`rounded-full p-2 ${s.bgColor}`}>
-                <Icon name={s.icon} size={20} className={s.color} />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Appointments List */}
-      <div className="bg-card rounded-xl border border-border organic-shadow">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-text-primary">
-            Appointments
-          </h3>
-          <Icon name="Calendar" size={20} className="text-text-secondary" />
+      {/* Today's Appointments */}
+      <div className="bg-card rounded-xl border border-border">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Today's Appointments</h3>
+          <Icon name="Calendar" size={20} />
         </div>
 
         <div className="p-4 space-y-3">
-          {loading && (
-            <div className="p-3 text-text-secondary">
-              Loading appointments…
-            </div>
-          )}
+          {loading && <p>Loading…</p>}
 
           {!loading && todaysAppointments.length === 0 && (
-            <div className="p-3 text-text-secondary">
-              No appointments found for this doctor yet.
-            </div>
+            <p className="text-text-secondary">No appointments for today</p>
           )}
 
-          {todaysAppointments.map((appointment) => (
+          {todaysAppointments.map((apt) => (
             <div
-              key={appointment.id}
-              className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border hover:border-green-700 organic-transition"
+              key={apt._id}
+              className="p-4 bg-white rounded-lg border hover:border-green-700"
             >
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h4 className="font-medium text-text-primary">
-                    {appointment.patient}
-                  </h4>
-                  {appointment.dosha && (
-                    <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-                      {appointment.dosha}
-                    </span>
-                  )}
+              {/* Top Section */}
+              <div
+                className="flex justify-between cursor-pointer"
+                onClick={() => openPatientProfile(apt.patientId?._id)}
+              >
+                <div>
+                  <h4 className="font-medium">{apt.patientId?.fullName}</h4>
+                  <p className="text-xs text-gray-500">{apt.sessionType}</p>
                 </div>
-                {appointment.condition && (
-                  <p className="text-sm text-text-secondary">
-                    {appointment.condition}
-                  </p>
-                )}
+                <p className="text-sm font-medium">{apt.time}</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-text-primary">
-                  {appointment.timeLabel}
-                </p>
-                <p className="text-xs text-text-secondary">
-                  {appointment.type}
-                </p>
-              </div>
-            </div>
-          ))}
 
-          <button
-            className="w-full mt-3 p-2 text-sm text-primary hover:bg-primary/5 rounded-lg organic-transition"
-            onClick={() => console.log("View all appointments clicked")}
-          >
-            View All Appointments
-          </button>
-        </div>
-      </div>
+              {/* Buttons */}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => acceptAppointment(apt)}
+                  className="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700"
+                >
+                  Accept
+                </button>
 
-      {/* Recent Activities */}
-      <div className="bg-card rounded-xl border border-border organic-shadow">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-text-primary">
-            Recent Activities
-          </h3>
-          <Icon name="Clock" size={20} className="text-text-secondary" />
-        </div>
-
-        <div className="p-4 space-y-3">
-          {recentActivities.length === 0 && (
-            <div className="text-text-secondary">No recent activities</div>
-          )}
-          {recentActivities.map((act) => (
-            <div
-              key={act.id}
-              className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border"
-            >
-              <div>
-                <div className="flex items-center space-x-2 mb-1">
-                  <h4 className="font-medium text-text-primary">
-                    {act.patient}
-                  </h4>
-                  {act.dosha && (
-                    <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-                      {act.dosha}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-text-secondary">{act.action}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-text-secondary">
-                  {act.timeLabel}
-                </p>
+                <button
+                  onClick={() => rejectAppointment(apt)}
+                  className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700"
+                >
+                  Reject
+                </button>
               </div>
             </div>
           ))}
@@ -382,16 +202,11 @@ const DashboardOverview = () => {
       </div>
 
       {error && (
-        <div className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+        <div className="text-sm text-red-600 bg-red-50 border p-2 rounded">
           {error}
         </div>
       )}
-      <DoctorAppointmentsWidget
-  appointments={appointments}
-  setAppointments={setAppointments}
-  loading={loading}
-/>
-
+      <DoctorAppointmentsWidget />
     </div>
   );
 };
