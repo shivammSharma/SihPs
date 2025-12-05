@@ -3,25 +3,27 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Icon from "../../../components/AppIcon";
 import useAuth from "../../../hooks/useAuth";
+import DoctorAppointmentsWidget from "./DoctorAppointmentsWidget";
+
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const DashboardOverview = () => {
   const [patients, setPatients] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const { user } = useAuth();
 
-  // axios instance for this component
   const api = axios.create({
     baseURL: API_BASE,
     headers: { "Content-Type": "application/json" },
   });
 
   useEffect(() => {
-    const fetchPatients = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -30,42 +32,66 @@ const DashboardOverview = () => {
         if (!token) {
           setError("Not authenticated. Please log in as a doctor.");
           setPatients([]);
+          setAppointments([]);
           return;
         }
 
-        const res = await api.get("/api/patients", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const [patientsRes, apptRes] = await Promise.all([
+          api.get("/api/patients", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          api.get("/api/appointments/doctor/me", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-        setPatients(res.data || []);
+        console.log("DEBUG /api/patients:", patientsRes.data);
+        console.log(
+          "DEBUG /api/appointments/doctor/me:",
+          apptRes.data?.appointments
+        );
+
+        setPatients(patientsRes.data || []);
+        setAppointments(apptRes.data?.appointments || []);
       } catch (err) {
-        console.error("Failed to load patients", err);
+        console.error("DashboardOverview load error", err);
         const msg =
           err?.response?.data?.message ||
           err?.response?.data?.error ||
-          "Failed to load patients";
+          "Failed to load dashboard data";
         setError(msg);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPatients();
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Helper: same-day comparison
-  const isSameDay = (dateA, dateB) => {
-    if (!dateA || !dateB) return false;
-    const a = new Date(dateA);
-    const b = new Date(dateB);
-    return (
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate()
-    );
+  // helper: parse "YYYY-MM-DD" or "DD-MM-YYYY" + "HH:mm"
+  const parseAppointmentDate = (dateStr, timeStr) => {
+    if (!dateStr) return null;
+    const parts = String(dateStr).split("-");
+    if (parts.length !== 3) return null;
+
+    let year, month, day;
+
+    if (parts[0].length === 4) {
+      // "YYYY-MM-DD"
+      [year, month, day] = parts;
+    } else {
+      // "DD-MM-YYYY"
+      [day, month, year] = parts;
+    }
+
+    const iso = `${year}-${month}-${day}T${timeStr || "00:00"}:00`;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      console.warn("Invalid parsed appointment date:", { dateStr, timeStr, iso });
+      return null;
+    }
+    return d;
   };
 
   const { todayStats, todaysAppointments, recentActivities } = useMemo(() => {
@@ -80,41 +106,47 @@ const DashboardOverview = () => {
     const todays = [];
     const activities = [];
 
+    // 🔥 IMPORTANT:
+    // For now, treat "Today's Appointments" widget as
+    // "All appointments for this doctor", sorted by date/time.
+    appointments.forEach((apt) => {
+      const dt = parseAppointmentDate(apt.date, apt.time) || new Date();
+
+      todays.push({
+        id: apt._id,
+        patient:
+          apt.patientId?.fullName ||
+          apt.patientId?.name ||
+          "Patient",
+        timeISO: dt.toISOString(),
+        timeLabel: dt.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        type: apt.sessionType || "Consultation",
+        dosha: "",
+        condition: "",
+        nextAppointmentDate: dt,
+      });
+    });
+
+    // sort by upcoming first
+    todays.sort((a, b) => a.nextAppointmentDate - b.nextAppointmentDate);
+    stats.appointments = todays.length;
+
+    // Recent stats from clinical patients (same as before)
     patients.forEach((p) => {
       const createdAt = p.createdAt ? new Date(p.createdAt) : null;
       const updatedAt = p.updatedAt ? new Date(p.updatedAt) : null;
 
-      // Today’s appointments
-      if (p.nextAppointment && isSameDay(p.nextAppointment, now)) {
-        stats.appointments += 1;
-        const nextDate = new Date(p.nextAppointment);
-
-        todays.push({
-          id: p._id || p.id,
-          patient: p.name,
-          timeISO: p.nextAppointment,
-          timeLabel: nextDate.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          type: p.type || "Follow-up",
-          dosha: p.dosha || "",
-          condition: p.condition || "",
-          nextAppointmentDate: nextDate,
-        });
-      }
-
-      // Pending reviews (you can adjust this rule)
       if (String(p.status).toLowerCase() === "followup") {
         stats.pendingReviews += 1;
       }
 
-      // Progress alerts (low progress)
       if (typeof p.progress === "number" && p.progress < 30) {
         stats.progressAlerts += 1;
       }
 
-      // New patients: status 'new' or created in last 7 days
       const daysSinceCreated = createdAt
         ? (now - createdAt) / (1000 * 60 * 60 * 24)
         : 999;
@@ -123,7 +155,6 @@ const DashboardOverview = () => {
         stats.newPatients += 1;
       }
 
-      // Recent activity feed
       if (createdAt && now - createdAt <= 1000 * 60 * 60 * 24 * 7) {
         activities.push({
           id: `new-${p._id || p.id}`,
@@ -150,22 +181,22 @@ const DashboardOverview = () => {
       }
     });
 
-    // Sort / trim results
-    todays.sort((a, b) => a.nextAppointmentDate - b.nextAppointmentDate);
     activities.sort((a, b) => b.when - a.when);
     const recentTop = activities.slice(0, 5);
+
+    console.log("DEBUG mapped todaysAppointments:", todays);
 
     return {
       todayStats: stats,
       todaysAppointments: todays,
       recentActivities: recentTop,
     };
-  }, [patients]);
+  }, [patients, appointments]);
 
   const quickStats = [
     {
       id: 1,
-      title: "Today's Appointments",
+      title: "Doctor's Appointments",
       value: todayStats.appointments,
       icon: "Calendar",
       color: "text-primary",
@@ -217,7 +248,7 @@ const DashboardOverview = () => {
             </h2>
             <p className="text-sm text-text-secondary">
               <b>{loading ? "Loading..." : todayStats.appointments}</b>{" "}
-              appointments scheduled today.
+              total appointments linked to you.
             </p>
           </div>
         </div>
@@ -245,11 +276,11 @@ const DashboardOverview = () => {
         ))}
       </div>
 
-      {/* Today's Appointments */}
+      {/* Appointments List */}
       <div className="bg-card rounded-xl border border-border organic-shadow">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h3 className="text-lg font-semibold text-text-primary">
-            Today&apos;s Appointments
+            Appointments
           </h3>
           <Icon name="Calendar" size={20} className="text-text-secondary" />
         </div>
@@ -263,7 +294,7 @@ const DashboardOverview = () => {
 
           {!loading && todaysAppointments.length === 0 && (
             <div className="p-3 text-text-secondary">
-              No appointments for today
+              No appointments found for this doctor yet.
             </div>
           )}
 
@@ -283,9 +314,11 @@ const DashboardOverview = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-text-secondary">
-                  {appointment.condition}
-                </p>
+                {appointment.condition && (
+                  <p className="text-sm text-text-secondary">
+                    {appointment.condition}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-text-primary">
@@ -353,6 +386,7 @@ const DashboardOverview = () => {
           {error}
         </div>
       )}
+      <DoctorAppointmentsWidget />
     </div>
   );
 };

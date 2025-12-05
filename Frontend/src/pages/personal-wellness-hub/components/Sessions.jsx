@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import BookingModal from "./BookingModal";
+import useAuth from "../../../hooks/useAuth";
+
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const SessionCard = ({ title, price, desc, selected, onClick }) => (
   <div
@@ -23,6 +27,8 @@ const SessionCard = ({ title, price, desc, selected, onClick }) => (
 );
 
 const Sessions = () => {
+  const { user, token } = useAuth();
+
   const [selected, setSelected] = useState("Initial Consultation");
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -33,6 +39,7 @@ const Sessions = () => {
 
   const [appointments, setAppointments] = useState([]);
   const [activeTab, setActiveTab] = useState("book");
+  const [loading, setLoading] = useState(false);
 
   const types = [
     {
@@ -52,28 +59,56 @@ const Sessions = () => {
     },
   ];
 
-  const formatDate = (d) => {
-    if (!d.includes("-")) return d;
-    const [day, month, year] = d.split("-");
-    return `${year}-${month}-${day}`;
-  };
+
+const formatDate = (val) => {
+  if (!val) return "";
+
+  // If already ISO format, keep it as is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+
+  // Otherwise assume DD-MM-YYYY
+  const [dd, mm, yyyy] = val.split("-");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+  // Helper: axios instance with auth header
+  const api = axios.create({
+    baseURL: API_BASE,
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : {},
+  });
 
   useEffect(() => {
-    // Fetch Doctors
-    axios
-      .get("http://localhost:9000/api/doctors")
-      .then((res) => setDoctors(res.data))
-      .catch((err) => console.error("Error loading doctors:", err));
+    if (!token) return;
 
-    // Fetch Appointments
-    const patientId = localStorage.getItem("patientId");
-    if (patientId) {
-      axios
-        .get(`http://localhost:9000/api/appointments/patient/${patientId}`)
-        .then((res) => setAppointments(res.data.appointments || []))
-        .catch((err) => console.error("Error fetching appointments:", err));
-    }
-  }, []);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        // 1) Fetch doctors (you must have /api/doctors defined on backend)
+        const resDocs = await api.get("/api/doctors");
+        setDoctors(resDocs.data || []);
+
+        // 2) Fetch appointments for logged-in patient
+        const patientId = user?.id;
+        if (patientId) {
+          const resApt = await api.get(
+            `/api/appointments/patient/${patientId}`
+          );
+          setAppointments(resApt.data.appointments || []);
+        }
+      } catch (err) {
+        console.error("Error loading sessions data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [token, user?.id]);
 
   const handleBookClick = (doc) => {
     setSelectedDoctor(doc);
@@ -82,10 +117,21 @@ const Sessions = () => {
 
   const handleConfirmBooking = async () => {
     try {
-      const patientId = localStorage.getItem("patientId");
-      if (!patientId) return alert("Patient ID missing. Please login again.");
+      const patientId = user?.id;
+      if (!patientId) {
+        alert("Patient ID missing. Please login again.");
+        return;
+      }
+      if (!selectedDoctor) {
+        alert("Select a doctor first.");
+        return;
+      }
+      if (!date || !time) {
+        alert("Please select date and time.");
+        return;
+      }
 
-      await axios.post("http://localhost:9000/api/appointments", {
+      await api.post("/api/appointments", {
         patientId,
         doctorId: selectedDoctor._id,
         sessionType: selected,
@@ -93,23 +139,30 @@ const Sessions = () => {
         time,
       });
 
-      alert("Appointment Booked Successfully!");
+      alert("Appointment booked successfully!");
       setShowModal(false);
       setDate("");
       setTime("");
       setSelectedDoctor(null);
 
       // Refresh appointments
-      const res = await axios.get(
-        `http://localhost:9000/api/appointments/patient/${patientId}`
-      );
+      const res = await api.get(`/api/appointments/patient/${patientId}`);
       setAppointments(res.data.appointments || []);
-
     } catch (err) {
       console.error("BOOKING ERROR:", err);
-      alert("Error booking appointment");
+      const msg =
+        err?.response?.data?.message ||
+        "Error booking appointment. Please try again.";
+      alert(msg);
     }
   };
+
+  const upcomingAppointments = appointments.filter(
+    (apt) => apt.status !== "completed" && apt.status !== "cancelled"
+  );
+  const pastAppointments = appointments.filter(
+    (apt) => apt.status === "completed" || apt.status === "cancelled"
+  );
 
   return (
     <>
@@ -121,7 +174,6 @@ const Sessions = () => {
           </p>
 
           <div className="mt-8 bg-white p-6 rounded-xl shadow-sm">
-
             {/* Tabs */}
             <div className="mb-6">
               <ul className="flex gap-8 border-b pb-3 text-sm md:text-base">
@@ -160,8 +212,12 @@ const Sessions = () => {
               </ul>
             </div>
 
+            {loading && (
+              <p className="text-sm text-gray-500">Loading…</p>
+            )}
+
             {/* TAB 1 — BOOK SESSION */}
-            {activeTab === "book" && (
+            {!loading && activeTab === "book" && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 mb-8">
                   {types.map((t) => (
@@ -177,42 +233,57 @@ const Sessions = () => {
                 </div>
 
                 <div className="mt-4 space-y-4">
-                  {doctors.map((doc) => (
-                    <div
-                      key={doc._id}
-                      className="p-5 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
-                    >
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-lg font-semibold">{doc.fullName}</h3>
+                  {doctors.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      No doctors available yet.
+                    </p>
+                  ) : (
+                    doctors.map((doc) => (
+                      <div
+                        key={doc._id}
+                        className="p-5 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-lg font-semibold">
+                              {doc.fullName}
+                            </h3>
+                            {doc.specialization && (
+                              <p className="text-xs text-gray-500">
+                                {doc.specialization}
+                              </p>
+                            )}
+                          </div>
 
-                        {doc.verified && (
-                          <span className="text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full text-xs font-medium">
-                            Verified
-                          </span>
-                        )}
-                      </div>
+                          {doc.verified && (
+                            <span className="text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full text-xs font-medium">
+                              Verified
+                            </span>
+                          )}
+                        </div>
 
-                      <div className="mt-4 flex justify-end">
-                        <button
-                          onClick={() => handleBookClick(doc)}
-                          className="px-6 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition"
-                        >
-                          Book
-                        </button>
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            onClick={() => handleBookClick(doc)}
+                            className="px-6 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                          >
+                            Book
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </>
             )}
 
             {/* TAB 2 — SCHEDULED SESSIONS */}
-            {activeTab === "scheduled" && (
+            {!loading && activeTab === "scheduled" && (
               <div className="mt-4 space-y-4">
-                {appointments.length === 0 ? (
+                {upcomingAppointments.length === 0 ? (
                   <p className="text-gray-500">No scheduled sessions.</p>
                 ) : (
-                  appointments.map((apt) => (
+                  upcomingAppointments.map((apt) => (
                     <div
                       key={apt._id}
                       className="p-5 border rounded-xl shadow-sm bg-emerald-50"
@@ -238,6 +309,45 @@ const Sessions = () => {
               </div>
             )}
 
+            {/* TAB 3 — HISTORY */}
+            {!loading && activeTab === "history" && (
+              <div className="mt-4 space-y-4">
+                {pastAppointments.length === 0 ? (
+                  <p className="text-gray-500">
+                    No past sessions recorded yet.
+                  </p>
+                ) : (
+                  pastAppointments.map((apt) => (
+                    <div
+                      key={apt._id}
+                      className="p-5 border rounded-xl shadow-sm bg-gray-50"
+                    >
+                      <h3 className="font-semibold text-lg">
+                        {apt.sessionType}
+                      </h3>
+
+                      <p className="text-gray-700 mt-1">
+                        Doctor: {apt.doctorId?.fullName}
+                      </p>
+
+                      <p className="text-gray-600 mt-1">
+                        Date: {apt.date} • Time: {apt.time}
+                      </p>
+
+                      <span
+                        className={`text-sm font-medium ${
+                          apt.status === "completed"
+                            ? "text-emerald-700"
+                            : "text-red-600"
+                        }`}
+                      >
+                        Status: {apt.status}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>

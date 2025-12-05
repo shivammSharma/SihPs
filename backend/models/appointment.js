@@ -20,12 +20,12 @@ const appointmentSchema = new mongoose.Schema(
     },
 
     date: {
-      type: String, // frontend sends "DD-MM-YYYY"
+      type: Date,     // FIXED: always store real Date
       required: true,
     },
 
     time: {
-      type: String, // frontend sends "HH:mm"
+      type: String,   // keep HH:mm
       required: true,
     },
 
