@@ -72,7 +72,7 @@ app.get("/api/health", (req, res) => {
 // --------------------------
 const PORT = process.env.PORT || 9000;
 const MONGODB_URI =
-  process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ayurveda";
+  process.env.MONGO_URI || "mongodb://127.0.0.1:27017/ayurveda";
 
 // HTTP server for WebSockets
 const server = http.createServer(app);

@@ -121,6 +121,9 @@ router.post("/:id/accept", async (req, res) => {
     }
 
     /* ------------------ NEW FEATURE: ADD APPOINTMENT HISTORY ------------------ */
+    if (!Array.isArray(clinical.appointmentHistory)) {
+  clinical.appointmentHistory = [];
+}
     clinical.appointmentHistory.push({
       appointmentId: appointment._id,
       doctorId: appointment.doctorId._id,

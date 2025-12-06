@@ -53,6 +53,15 @@ const AppRoutes = () => {
             path="/doctor/diet-builder/:patientId"
             element={<DoctorDietBuilderPage />}
           />
+          <Route
+  path="/personal-wellness-hub/food-scan"
+  element={<FoodScan />}
+/>
+
+<Route
+  path="/personal-wellness-hub/food-scan/result"
+  element={<FoodScanResult />}
+/>
           <Route path="*" element={<NotFound />} />
           <Route
     path="/doctor/week-planner/:patientId"

@@ -1,4 +1,3 @@
-// backend/config/db.js
 const mongoose = require('mongoose');
 
 async function connectDB() {
@@ -10,7 +9,10 @@ async function connectDB() {
 
   try {
     await mongoose.connect(uri);
+
     console.log('MongoDB connected');
+    console.log('Connected Host:', mongoose.connection.host);
+    console.log('Connected DB:', mongoose.connection.name);
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
     process.exit(1);
