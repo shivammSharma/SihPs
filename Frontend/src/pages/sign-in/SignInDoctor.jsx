@@ -57,7 +57,6 @@ const SignInDoctor = () => {
 
       <main className="flex-1 flex items-center justify-center px-4 py-10">
         <div className="max-w-5xl w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 items-center animate-fadeInUp">
-          
           {/* Left info */}
           <div className="hidden md:block">
             <p className="text-sm uppercase tracking-[0.2em] text-emerald-700/80 font-semibold mb-3">

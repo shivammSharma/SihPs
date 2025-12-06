@@ -19,7 +19,7 @@ const Footer = () => {
     }
 
     try {
-      const res = await fetch("http://localhost:9000/api/subscribe", {
+      const res = await fetch("http://localhost:5000/api/subscribe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -39,9 +39,8 @@ const Footer = () => {
     }
   };
 
-  // ------------------------
+ 
   // FOOTER LINKS + DATA
-  // ------------------------
   const footerSections = [
     {
       title: 'Platform',
@@ -49,26 +48,12 @@ const Footer = () => {
         { name: 'Intelligence Center', path: '/ayurvedic-intelligence-center' },
         { name: 'Professional Portal', path: '/professional-dashboard-portal' },
         { name: 'Wellness Hub', path: '/personal-wellness-hub' },
-        { name: 'Research Library', path: '/clinical-research-library' },
-        { name: 'Success Stories', path: '/patient-success-stories' }
-      ]
-    },
-    {
-      title: 'Resources',
-      links: [
-        { name: 'Documentation', path: '/docs' },
-        { name: 'API Reference', path: '/api' },
-        { name: 'Help Center', path: '/help' },
-        { name: 'Training Materials', path: '/training' },
-        { name: 'Webinars', path: '/webinars' }
       ]
     },
     {
       title: 'Company',
       links: [
         { name: 'About Us', path: '/about' },
-        { name: 'Careers', path: '/careers' },
-        { name: 'Press Kit', path: '/press' },
         { name: 'Partners', path: '/partners' },
         { name: 'Contact', path: '/contact' }
       ]
@@ -76,20 +61,18 @@ const Footer = () => {
     {
       title: 'Legal',
       links: [
-        { name: 'Privacy Policy', path: '/privacy' },
         { name: 'Terms of Service', path: '/terms' },
         { name: 'HIPAA Compliance', path: '/hipaa' },
         { name: 'Security', path: '/security' },
-        { name: 'Accessibility', path: '/accessibility' }
       ]
     }
   ];
 
   const socialLinks = [
-    { name: 'LinkedIn', icon: 'Linkedin', url: 'https://linkedin.com/company/ayurnutri' },
-    { name: 'Twitter', icon: 'Twitter', url: 'https://twitter.com/ayurnutri' },
-    { name: 'YouTube', icon: 'Youtube', url: 'https://youtube.com/ayurnutri' },
-    { name: 'Instagram', icon: 'Instagram', url: 'https://instagram.com/ayurnutri' }
+    // { name: 'LinkedIn', icon: 'Linkedin', url: 'https://linkedin.com/company/ayurnutri' },
+    // { name: 'Twitter', icon: 'Twitter', url: 'https://twitter.com/ayurnutri' },
+    // { name: 'YouTube', icon: 'Youtube', url: 'https://youtube.com/ayurnutri' },
+    // { name: 'Instagram', icon: 'Instagram', url: 'https://instagram.com/ayurnutri' }
   ];
 
   return (
@@ -107,8 +90,7 @@ const Footer = () => {
                 Stay Updated with AyurNutri Insights
               </h3>
               <p className="text-text-secondary">
-                Get the latest research, case studies, and platform updates delivered to your inbox. 
-                Join 5,000+ healthcare professionals advancing integrative medicine.
+                Get the updates, case studies, and platform updates delivered to your inbox. 
               </p>
             </div>
             
@@ -154,8 +136,8 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid lg:grid-cols-6 gap-8">
 
-          {/* Brand */}
-          <div className="lg:col-span-2">
+        
+          {/* <div className="lg:col-span-2">
             <Link to="/homepage-ayur-nutri-platform" className="flex items-center space-x-3 mb-6">
               <div className="relative">
                 <svg width="40" height="40" viewBox="0 0 40 40" className="text-primary">
@@ -181,7 +163,7 @@ const Footer = () => {
 
             <p className="text-text-secondary mb-6 leading-relaxed">
               Pioneering the future of healthcare by seamlessly integrating 5,000-year-old Ayurvedic wisdom 
-              with cutting-edge nutritional science and AI technology.
+              with cutting-edge nutritional science.
             </p>
 
             <div className="flex space-x-4">
@@ -198,7 +180,7 @@ const Footer = () => {
                 </a>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* Footer Sections */}
           {footerSections?.map((section) => (
@@ -231,7 +213,7 @@ const Footer = () => {
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-text-secondary">
               <p>© {currentYear} AyurNutri. All rights reserved.</p>
-              <div className="flex items-center space-x-4">
+              {/* <div className="flex items-center space-x-4">
                 <Link to="/privacy" className="hover:text-primary organic-transition">
                   Privacy
                 </Link>
@@ -241,13 +223,13 @@ const Footer = () => {
                 <Link to="/cookies" className="hover:text-primary organic-transition">
                   Cookies
                 </Link>
-              </div>
+              </div> */}
             </div>
 
             <div className="flex items-center space-x-4 text-sm text-text-secondary">
               <span>Made with</span>
               <Icon name="Heart" size={16} className="text-red-500" />
-              <span>for healthcare innovation</span>
+              <span>for ayurvedic innovation</span>
             </div>
 
           </div>

@@ -206,7 +206,6 @@ const DashboardOverview = () => {
           {error}
         </div>
       )}
-      <DoctorAppointmentsWidget />
     </div>
   );
 };

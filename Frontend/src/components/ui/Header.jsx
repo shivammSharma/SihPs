@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import Icon from "../AppIcon";
 import Button from "./Button";
 import useAuth from "../../hooks/useAuth";
+import Logo from "../../assets/logo.jpg"; 
 
 const Header = ({ className = "", isHomePage = false }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -21,7 +22,9 @@ const Header = ({ className = "", isHomePage = false }) => {
     pathname.includes("homepage") ||
     pathname.startsWith("/homepage-ayur-nutri-platform");
 
-  const isDoctorDashboard = pathname.startsWith("/professional-dashboard-portal");
+  const isDoctorDashboard = pathname.startsWith(
+    "/professional-dashboard-portal"
+  );
   const isAuthSelection = pathname.startsWith("/auth-selection");
 
   const role = isDoctor ? "doctor" : isPatient ? "patient" : null;
@@ -66,7 +69,6 @@ const Header = ({ className = "", isHomePage = false }) => {
     >
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-3 items-center h-16 px-4 sm:px-6 lg:px-8">
-
           {/* Logo */}
           <div className="col-span-1 flex items-center">
             <Link
@@ -74,15 +76,11 @@ const Header = ({ className = "", isHomePage = false }) => {
               className="flex items-center space-x-3 organic-transition hover:opacity-80"
             >
               <div className="relative">
-                <svg width="40" height="40" viewBox="0 0 40 40" className="text-primary">
-                  <circle cx="20" cy="20" r="18" fill="currentColor" className="opacity-10" />
-                  <path
-                    d="M20 8c-1.5 0-3 .5-4 1.5L12 14l4 4 4-4-4-4c1-.5 2.5-1 4-1s3 .5 4 1l-4 4 4 4 4-4.5c1-1 1.5-2.5 1.5-4s-.5-3-1.5-4S21.5 8 20 8z"
-                    fill="currentColor"
-                  />
-                  <circle cx="20" cy="26" r="6" fill="var(--color-secondary)" className="opacity-80" />
-                  <circle cx="20" cy="26" r="3" fill="currentColor" />
-                </svg>
+                <img
+                  src={Logo}
+                  alt="AyurNutri Logo"
+                  className="w-10 h-10 rounded-full object-contain"
+                />
               </div>
 
               <div className="flex flex-col">
@@ -100,7 +98,6 @@ const Header = ({ className = "", isHomePage = false }) => {
           {!isDoctorDashboard && !isAuthSelection && (
             <nav className="col-span-1 hidden lg:flex items-center justify-center">
               <div className="flex items-center space-x-1 bg-background/80 backdrop-blur-sm rounded-xl p-2 organic-shadow">
-
                 <button
                   onClick={handleProfessionalPortal}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm ${
@@ -124,36 +121,31 @@ const Header = ({ className = "", isHomePage = false }) => {
                   <Icon name="Heart" size={16} />
                   <span>Wellness Hub</span>
                 </button>
-
               </div>
             </nav>
           )}
 
           {/* Right Section */}
           <div className="col-span-1 flex items-center justify-end space-x-3">
-
             {/* HOMEPAGE AUTH LOGIC */}
-       {/* HOMEPAGE AUTH LOGIC */}
-{isHome && (
-  (() => {
-    if (isAuthenticated) {
-      // auto-logout silently when user reaches homepage
-      logout();
-    }
+            {isHome &&
+              (() => {
+                if (isAuthenticated) {
+                  // auto-logout silently when user reaches homepage
+                  logout();
+                }
 
-    return (
-      <Button
-        variant="default"
-        size="sm"
-        className="bg-brand-gold hover:bg-brand-gold/90 hidden lg:flex"
-        onClick={handleSignInClick}
-      >
-        Sign In
-      </Button>
-    );
-  })()
-)}
-
+                return (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-brand-gold hover:bg-brand-gold/90 hidden lg:flex"
+                    onClick={handleSignInClick}
+                  >
+                    Sign In
+                  </Button>
+                );
+              })()}
 
             {/* Logged-in user (ONLY on dashboard pages) */}
             {!isHome && isAuthenticated && (
@@ -190,7 +182,6 @@ const Header = ({ className = "", isHomePage = false }) => {
         {/* MOBILE MENU */}
         {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-border bg-background/95 backdrop-blur-md px-4 py-4 space-y-4">
-
             <button
               className="w-full flex items-center space-x-3 px-3 py-3 rounded-md hover:bg-muted/50"
               onClick={() => {

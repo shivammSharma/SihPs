@@ -1,96 +1,101 @@
 import React from "react";
 import { cn } from "../../utils/cn";
 
-const Input = React.forwardRef(({
-    className,
-    type = "text",
-    label,
-    description,
-    error,
-    required = false,
-    id,
-    ...props
-}, ref) => {
+const Input = React.forwardRef(
+  (
+    {
+      className,
+      type = "text",
+      label,
+      description,
+      error,
+      required = false,
+      id,
+      placeholder,
+      ...props
+    },
+    ref
+  ) => {
     // Generate unique ID if not provided
-    const inputId = id || `input-${Math.random()?.toString(36)?.substr(2, 9)}`;
+    const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Base input classes
-    const baseInputClasses = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+    // Base input classes (placeholder FIXED)
+    const baseInputClasses =
+      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm " +
+      "ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium " +
+      "placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 " +
+      "focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-    // Checkbox-specific styles
+    // Checkbox input
     if (type === "checkbox") {
-        return (
-            <input
-                type="checkbox"
-                className={cn(
-                    "h-4 w-4 rounded border border-input bg-background text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                    className
-                )}
-                ref={ref}
-                id={inputId}
-                {...props}
-            />
-        );
+      return (
+        <input
+          type="checkbox"
+          className={cn(
+            "h-4 w-4 rounded border border-input bg-background text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            className
+          )}
+          ref={ref}
+          id={inputId}
+          {...props}
+        />
+      );
     }
 
-    // Radio button-specific styles
+    // Radio input
     if (type === "radio") {
-        return (
-            <input
-                type="radio"
-                className={cn(
-                    "h-4 w-4 rounded-full border border-input bg-background text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                    className
-                )}
-                ref={ref}
-                id={inputId}
-                {...props}
-            />
-        );
+      return (
+        <input
+          type="radio"
+          className={cn(
+            "h-4 w-4 rounded-full border border-input bg-background text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            className
+          )}
+          ref={ref}
+          id={inputId}
+          {...props}
+        />
+      );
     }
 
-    // For regular inputs with wrapper structure
+    // Normal input
     return (
-        <div className="space-y-2">
-            {label && (
-                <label
-                    htmlFor={inputId}
-                    className={cn(
-                        "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-                        error ? "text-destructive" : "text-foreground"
-                    )}
-                >
-                    {label}
-                    {required && <span className="text-destructive ml-1">*</span>}
-                </label>
+      <div className="space-y-2">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className={cn(
+              "text-sm font-medium leading-none",
+              error ? "text-destructive" : "text-foreground"
             )}
+          >
+            {label}
+            {required && <span className="text-destructive ml-1">*</span>}
+          </label>
+        )}
 
-            <input
-                type={type}
-                className={cn(
-                    baseInputClasses,
-                    error && "border-destructive focus-visible:ring-destructive",
-                    className
-                )}
-                ref={ref}
-                id={inputId}
-                {...props}
-            />
+        <input
+          type={type}
+          {...props}              // <-- ensures placeholder is passed
+          placeholder={placeholder} // <-- FINAL override so it's ALWAYS visible
+          className={cn(
+            baseInputClasses,
+            error && "border-destructive focus-visible:ring-destructive",
+            className
+          )}
+          ref={ref}
+          id={inputId}
+        />
 
-            {description && !error && (
-                <p className="text-sm text-muted-foreground">
-                    {description}
-                </p>
-            )}
+        {description && !error && (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        )}
 
-            {error && (
-                <p className="text-sm text-destructive">
-                    {error}
-                </p>
-            )}
-        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
     );
-});
+  }
+);
 
 Input.displayName = "Input";
 

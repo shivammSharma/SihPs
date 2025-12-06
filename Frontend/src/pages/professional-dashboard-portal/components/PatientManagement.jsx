@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
-import WeeklyPlanSummaryCard from "./WeeklyPlanSummaryCard";
-
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
@@ -177,92 +175,47 @@ const PatientManagement = () => {
   const formatDateTimeLocal = (value) => {
     if (!value) return "";
     const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "";
     const pad = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
       d.getDate()
     )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  /**
-   * Helper to normalize the next appointment coming from backend.
-   *
-   * Supports:
-   *  1) Old shape: nextAppointment = ISO date string
-   *  2) New shape: nextAppointment = { date, time, status, sessionType }
-   */
-  const getNextAppointmentDisplay = (patient) => {
-    const na = patient?.nextAppointment;
-    if (!na) return null;
-
-    let dateObj = null;
-    let status = "";
-    let sessionType = "";
-
-    if (typeof na === "object" && na !== null && ("date" in na || "time" in na)) {
-      const dateStr = na.date;
-      if (!dateStr) return null;
-      const timeStr = na.time || "00:00";
-      const iso = `${dateStr}T${timeStr}:00`;
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return null;
-      dateObj = d;
-      status = na.status || "Scheduled";
-      sessionType = na.sessionType || "";
-    } else {
-      const d = new Date(na);
-      if (Number.isNaN(d.getTime())) return null;
-      dateObj = d;
-    }
-
-    const datetimeLabel = dateObj.toLocaleString([], {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-
-    return {
-      datetimeLabel,
-      status,
-      sessionType,
-    };
-  };
-
   const fetchPatients = async () => {
-  try {
-    setLoading(true);
-    setErrorMsg("");
+    try {
+      setLoading(true);
+      setErrorMsg("");
 
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      setPatients([]);
-      setErrorMsg("Not authenticated. Please log in as a doctor.");
-      return;
-    }
-
-    const qParams = new URLSearchParams();
-    if (selectedFilter && selectedFilter !== "all")
-      qParams.set("status", selectedFilter);
-    if (selectedDosha && selectedDosha !== "all")
-      qParams.set("dosha", selectedDosha);
-    if (searchTerm) qParams.set("q", searchTerm);
-
-    const res = await fetch(
-      `${API_BASE}/api/patients?${qParams.toString()}`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        setPatients([]);
+        setErrorMsg("Not authenticated. Please log in as a doctor.");
+        return;
       }
-    );
 
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      console.error("Patients API non-200:", res.status, errBody);
-      throw new Error(
-        errBody.message || errBody.error || "Failed to fetch patients"
+      const qParams = new URLSearchParams();
+      if (selectedFilter && selectedFilter !== "all")
+        qParams.set("status", selectedFilter);
+      if (selectedDosha && selectedDosha !== "all")
+        qParams.set("dosha", selectedDosha);
+      if (searchTerm) qParams.set("q", searchTerm);
+
+      const res = await fetch(
+        `${API_BASE}/api/patients?${qParams.toString()}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
-    }
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(
+          errBody.message || errBody.error || "Failed to fetch patients"
+        );
+      }
 
       const data = await res.json();
       setPatients(data);
@@ -273,7 +226,6 @@ const PatientManagement = () => {
       setLoading(false);
     }
   };
-  
 
   const recalcBmi = (heightCm, weightKg) => {
     const h = Number(heightCm);
@@ -352,29 +304,12 @@ const PatientManagement = () => {
   };
 
   const openDetails = (patient) => {
-    // Compute nextAppointment value for datetime-local input
-    let nextApptLocal = "";
-    const na = patient?.nextAppointment;
-
-    if (na) {
-      if (typeof na === "object" && na !== null && ("date" in na || "time" in na)) {
-        const dateStr = na.date;
-        if (dateStr) {
-          const timeStr = na.time || "00:00";
-          const iso = `${dateStr}T${timeStr}:00`;
-          nextApptLocal = formatDateTimeLocal(iso);
-        }
-      } else {
-        nextApptLocal = formatDateTimeLocal(na);
-      }
-    }
-
     setSelectedPatient(patient);
     setEditFields((prev) => ({
       ...prev,
       condition: patient?.condition || "",
       status: patient?.status || "new",
-      nextAppointment: nextApptLocal,
+      nextAppointment: formatDateTimeLocal(patient?.nextAppointment),
 
       heightCm: patient?.heightCm ?? "",
       weightKg: patient?.weightKg ?? "",
@@ -386,7 +321,9 @@ const PatientManagement = () => {
       chronicConditions: patient?.chronicConditions || "",
       lifestyleNotes: patient?.lifestyleNotes || "",
       dietPreferences: patient?.dietPreferences || "",
-      // report fields stay as they were (empty unless doctor typed)
+
+      // Ayurvedic extra fields stay as previously typed in this session;
+      // if patient already has lifestyleNotes, doctor can see everything there.
     }));
     setShowDetails(true);
   };
@@ -597,76 +534,68 @@ const PatientManagement = () => {
         </div>
 
         <div className="divide-y divide-border">
-          {patients?.map((patient) => {
-            const nextApptInfo = getNextAppointmentDisplay(patient);
-
-            return (
-              <button
-                key={patient?._id || patient?.id}
-                className="w-full text-left p-4 hover:bg-muted/30 organic-transition"
-                onClick={() => openDetails(patient)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h4 className="font-semibold text-text-primary">
-                        {patient?.name}
-                      </h4>
-                      <span className="text-sm text-text-secondary">
-                        ({patient?.age}y)
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${getDoshaColor(
-                          patient?.dosha
-                        )}`}
-                      >
-                        {patient?.dosha}
-                      </span>
-                    </div>
-                    <p className="text-sm text-text-secondary">
-                      {patient?.condition}
-                    </p>
-
-                    {patient?.patientAccountId && (
-                      <p className="text-xs text-text-secondary mt-1">
-                        Account:{" "}
-                        <span className="font-medium">
-                          {patient.patientAccountId.fullName}
-                        </span>{" "}
-                        · {patient.patientAccountId.email} ·{" "}
-                        {patient.patientAccountId.phoneNumber}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="text-right space-y-1">
+          {patients?.map((patient) => (
+            <button
+              key={patient?._id || patient?.id}
+              className="w-full text-left p-4 hover:bg-muted/30 organic-transition"
+              onClick={() => openDetails(patient)}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h4 className="font-semibold text-text-primary">
+                      {patient?.name}
+                    </h4>
+                    <span className="text-sm text-text-secondary">
+                      ({patient?.age}y)
+                    </span>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full ${getStatusColor(
-                        patient?.status
+                      className={`text-xs px-2 py-1 rounded-full ${getDoshaColor(
+                        patient?.dosha
                       )}`}
                     >
-                      {getStatusLabel(patient?.status)}
+                      {patient?.dosha}
                     </span>
-
-                    {nextApptInfo && (
-                      <div className="text-xs text-text-secondary">
-                        <div>
-                          Next: {nextApptInfo.datetimeLabel}
-                          {nextApptInfo.sessionType &&
-                            ` · ${nextApptInfo.sessionType}`}
-                        </div>
-                        {nextApptInfo.status && (
-                          <span className="inline-flex mt-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px]">
-                            {nextApptInfo.status}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
+                  <p className="text-sm text-text-secondary">
+                    {patient?.condition}
+                  </p>
+
+                  {patient?.patientAccountId && (
+                    <p className="text-xs text-text-secondary mt-1">
+                      Account:{" "}
+                      <span className="font-medium">
+                        {patient.patientAccountId.fullName}
+                      </span>{" "}
+                      · {patient.patientAccountId.email} ·{" "}
+                      {patient.patientAccountId.phoneNumber}
+                    </p>
+                  )}
                 </div>
-              </button>
-            );
-          })}
+
+                <div className="text-right space-y-1">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${getStatusColor(
+                      patient?.status
+                    )}`}
+                  >
+                    {getStatusLabel(patient?.status)}
+                  </span>
+                  {patient?.nextAppointment && (
+                    <div className="text-xs text-text-secondary">
+                      Next:{" "}
+                      {new Date(
+                        patient.nextAppointment
+                      ).toLocaleString([], {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))}
           {patients?.length === 0 && !loading && (
             <div className="p-4 text-center text-text-secondary">
               No patients found
@@ -1328,10 +1257,7 @@ const PatientManagement = () => {
               </section>
 
               {/* Next Appointment + Diet Plan */}
-              
-              
-              
-              {/* <section className="border border-border/60 rounded-xl p-4">
+              <section className="border border-border/60 rounded-xl p-4">
                 <div className="grid md:grid-cols-2 gap-4 items-end">
                   <div>
                     <h4 className="text-sm font-semibold text-text-primary mb-1">
@@ -1358,29 +1284,22 @@ const PatientManagement = () => {
                       patient's meal plan.
                     </p>
 
-                <Button
-                  variant="default"
-                  className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
-                  onClick={() => {
-                    navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
-                      state: {
-                        patientName: selectedPatient.name,
-                      },
-                    });
-                  }}
-                >
-                  Open Diet Planner
-                </Button>
-               <WeeklyPlanSummaryCard
-    clinicalPatientId={selectedPatient._id}
-    onOpenPlanner={() =>
-      navigate(`/doctor/week-planner/${selectedPatient._id}`, {
-        state: { patientName: selectedPatient.name },
-      })
-    }
-  />
-
-              </section> */}
+                    <Button
+                      variant="default"
+                      className="w-full bg-green-700 text-white hover:bg-green-800 text-sm"
+                      onClick={() => {
+                        navigate(`/doctor/diet-builder/${selectedPatient._id}`, {
+                          state: {
+                            patientName: selectedPatient.name,
+                          },
+                        });
+                      }}
+                    >
+                      Open Diet Planner
+                    </Button>
+                  </div>
+                </div>
+              </section>
             </div>
 
             {/* Footer: Save button */}
