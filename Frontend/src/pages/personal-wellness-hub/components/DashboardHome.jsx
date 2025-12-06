@@ -1,38 +1,37 @@
 // src/pages/personal-wellness-hub/components/DashboardHome.jsx
 
 import React, { useEffect, useMemo, useState } from "react";
+import useAuth from "../../../hooks/useAuth";
 import Button from "../../../components/ui/Button";
+import PatientWeekPlan from "./PatientWeekPlan";
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const DashboardHome = () => {
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [profile, setProfile] = useState(null);
-  const [primaryRecord, setPrimaryRecord] = useState(null);
-  const [nextAppointment, setNextAppointment] = useState(null);
-  const [appointments, setAppointments] = useState([]);
+  const { token, user } = useAuth();
 
+  const [overview, setOverview] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState("");
 
-  // ⭐ REQUIRED FOR MODAL (your missing variable)
+  const [clinicalPatientId, setClinicalPatientId] = useState(null);
+  const [latestPlanId, setLatestPlanId] = useState(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+  const [weeklyError, setWeeklyError] = useState("");
+
   const [selectedReport, setSelectedReport] = useState(null);
 
   // =========================================================
-  // FETCH PATIENT OVERVIEW
+  // 1) FETCH PATIENT OVERVIEW
   // =========================================================
   useEffect(() => {
+    if (!token) return;
+
     const fetchOverview = async () => {
       try {
-        setLoading(true);
-        setErrorMsg("");
-
-        const token = localStorage.getItem("authToken");
-        if (!token) {
-          setErrorMsg("You are not logged in. Please sign in again.");
-          setLoading(false);
-          return;
-        }
+        setOverviewLoading(true);
+        setOverviewError("");
 
         const res = await fetch(`${API_BASE}/api/patient/overview`, {
           headers: {
@@ -41,59 +40,116 @@ const DashboardHome = () => {
           },
         });
 
+        const body = await res.json().catch(() => ({}));
+        console.log("🔍 /api/patient/overview:", body);
+
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.message || "Failed to load your dashboard.");
+          throw new Error(body.message || "Failed to load your dashboard");
         }
 
-        const data = await res.json();
-        console.log("🔍 OVERVIEW DATA:", data);
-
-        const primary =
-          data.primaryRecord ||
-          data.latestRecord ||
-          data.record ||
-          null;
-
-        setProfile(data.profile || null);
-        setPrimaryRecord(primary);
-        setNextAppointment(data.nextAppointment || null);
-        setAppointments(data.appointments || []);
-
-      } catch (err) {
-        console.error("Patient dashboard error:", err);
-        setErrorMsg(err.message || "Failed to load your dashboard.");
+        setOverview(body);
+      } catch (e) {
+        console.error("Overview error:", e);
+        setOverviewError(e.message || "Failed to load your dashboard");
       } finally {
-        setLoading(false);
+        setOverviewLoading(false);
       }
     };
 
     fetchOverview();
-  }, []);
+  }, [token]);
+
+  const profile = overview?.profile || null;
+  const latestRecord =
+    overview?.primaryRecord ||
+    overview?.latestRecord ||
+    overview?.record ||
+    null;
+  const appointments = overview?.appointments || [];
+  const nextAppointment = overview?.nextAppointment || null;
 
   // =========================================================
-  // HELPERS
+  // 2) FETCH WEEKLY PLANS (once we know clinical patient id)
+  // =========================================================
+  useEffect(() => {
+    if (!token) return;
+    if (!latestRecord?._id) {
+      setClinicalPatientId(null);
+      setLatestPlanId(null);
+      return;
+    }
+
+    const cpId = latestRecord._id;
+    setClinicalPatientId(cpId);
+
+    const fetchWeeklyPlans = async () => {
+      try {
+        setWeeklyLoading(true);
+        setWeeklyError("");
+
+        const res = await fetch(
+          `${API_BASE}/api/patients/${cpId}/week-plans`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const body = await res.json().catch(() => ({}));
+        console.log(`🔍 /api/patients/${cpId}/week-plans:`, body);
+
+        if (!res.ok) {
+          throw new Error(body.message || "Failed to load weekly plans");
+        }
+
+        const plans = body.weeklyPlans || [];
+        if (!plans.length) {
+          setLatestPlanId(null);
+          return;
+        }
+
+        plans.sort(
+          (a, b) =>
+            new Date(b.updatedAt || b.createdAt).getTime() -
+            new Date(a.updatedAt || a.createdAt).getTime()
+        );
+
+        setLatestPlanId(plans[0]._id);
+      } catch (e) {
+        console.error("Weekly plans error:", e);
+        setWeeklyError(e.message || "Failed to load weekly plan");
+      } finally {
+        setWeeklyLoading(false);
+      }
+    };
+
+    fetchWeeklyPlans();
+  }, [token, latestRecord?._id]);
+
+  // =========================================================
+  // 3) HELPERS / DERIVED VALUES
   // =========================================================
 
   const patientName = useMemo(() => {
     if (profile?.fullName) return profile.fullName;
+    if (user?.fullName) return user.fullName;
     return "AyurNutri User";
-  }, [profile]);
+  }, [profile, user]);
 
-  const prakritiLabel = primaryRecord?.dosha || "Not assessed yet";
-  const currentStateLabel = primaryRecord?.status || "No active clinical record";
+  const prakritiLabel = latestRecord?.dosha || "Not assessed yet";
+  const currentStateLabel =
+    latestRecord?.status || "No active clinical record";
 
   const doctorInfo = useMemo(() => {
-    const doc = primaryRecord?.doctorId;
+    const doc = latestRecord?.doctorId;
     if (!doc) return null;
     return {
       name: doc.fullName || "Your Ayurvedic Doctor",
       email: doc.email || "",
       phone: doc.phoneNumber || "",
     };
-  }, [primaryRecord]);
+  }, [latestRecord]);
 
-  const dietPlan = primaryRecord?.dietPlan || {
+  const dietPlan = latestRecord?.dietPlan || {
     breakfast: [],
     lunch: [],
     dinner: [],
@@ -119,8 +175,8 @@ const DashboardHome = () => {
 
   const hasDiet =
     (dietPlan.breakfast?.length || 0) +
-    (dietPlan.lunch?.length || 0) +
-    (dietPlan.dinner?.length || 0) >
+      (dietPlan.lunch?.length || 0) +
+      (dietPlan.dinner?.length || 0) >
     0;
 
   const formatDateTime = (val) => {
@@ -132,10 +188,10 @@ const DashboardHome = () => {
   };
 
   // =========================================================
-  // LOADING / ERROR UI
+  // 4) LOADING / ERROR STATES
   // =========================================================
 
-  if (loading && !profile && !primaryRecord) {
+  if (overviewLoading && !overview) {
     return (
       <div className="w-full py-10 text-center text-gray-600">
         Loading your wellness hub…
@@ -143,20 +199,19 @@ const DashboardHome = () => {
     );
   }
 
-  if (errorMsg && !profile) {
+  if (overviewError && !overview) {
     return (
       <div className="w-full py-10 text-center text-red-600 text-sm">
-        {errorMsg}
+        {overviewError}
       </div>
     );
   }
 
   // =========================================================
-  // MAIN DASHBOARD UI
+  // 5) MAIN UI
   // =========================================================
   return (
     <div className="w-full">
-
       {/* HEADER SECTION */}
       <div className="bg-[#E8E2D9] p-6 rounded-xl shadow-sm mb-8">
         <div className="flex justify-between items-start">
@@ -166,13 +221,13 @@ const DashboardHome = () => {
             </h1>
 
             <p className="text-gray-600 mt-2">
-              Welcome to your Ayurvedic wellness journey
+              Welcome to your Ayurvedic wellness journey.
             </p>
 
             {nextAppointment ? (
               <p className="text-sm text-gray-700 mt-2">
                 <span className="font-medium">Next appointment:</span>{" "}
-                {formatDateTime(nextAppointment.date)}{" "}
+                {formatDateTime(nextAppointment.date || nextAppointment)}{" "}
                 {nextAppointment.doctor?.fullName &&
                   `· with ${nextAppointment.doctor.fullName}`}
               </p>
@@ -218,10 +273,11 @@ const DashboardHome = () => {
 
       {/* DOCTOR + NUTRITION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
         {/* DOCTOR INFO CARD */}
         <div className="bg-[#E8E2D9] rounded-xl p-6 shadow-sm">
-          <h2 className="font-semibold text-gray-800 mb-3">Your Ayurvedic Doctor</h2>
+          <h2 className="font-semibold text-gray-800 mb-3">
+            Your Ayurvedic Doctor
+          </h2>
 
           {doctorInfo ? (
             <div className="bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center">
@@ -253,9 +309,8 @@ const DashboardHome = () => {
 
         {/* NUTRITION OVERVIEW */}
         <div className="bg-[#E8E2D9] rounded-xl p-6 shadow-sm">
-
           <h2 className="font-semibold text-gray-800 mb-3">
-            Today's Nutrition Overview
+            Today&apos;s Nutrition Overview
           </h2>
 
           {!hasDiet ? (
@@ -289,8 +344,8 @@ const DashboardHome = () => {
                       {meal.charAt(0).toUpperCase() + meal.slice(1)}
                     </p>
                     <p className="text-xs text-gray-600">
-                      {nutritionSummary.perMeal[meal].count} items ·{" "}
-                      {nutritionSummary.perMeal[meal].calories} cal
+                      {nutritionSummary.perMeal[meal]?.count ?? 0} items ·{" "}
+                      {nutritionSummary.perMeal[meal]?.calories ?? 0} cal
                     </p>
                   </div>
                 ))}
@@ -302,10 +357,11 @@ const DashboardHome = () => {
 
       {/* DIET + CLINICAL REPORTS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-
         {/* DIET DETAILS */}
         <div className="bg-[#E8E2D9] rounded-xl p-6 shadow-sm">
-          <h2 className="font-semibold text-gray-800 mb-4">Your Current Diet Plan</h2>
+          <h2 className="font-semibold text-gray-800 mb-4">
+            Your Current Diet Plan
+          </h2>
 
           {!hasDiet ? (
             <div className="bg-white p-4 rounded-xl border shadow-sm text-sm text-gray-600">
@@ -316,16 +372,23 @@ const DashboardHome = () => {
               const items = dietPlan[meal] || [];
 
               return (
-                <div key={meal} className="bg-white p-4 rounded-xl border shadow-sm mb-4">
+                <div
+                  key={meal}
+                  className="bg-white p-4 rounded-xl border shadow-sm mb-4"
+                >
                   <div className="flex justify-between mb-2">
                     <p className="font-medium text-gray-800">
                       {meal.charAt(0).toUpperCase() + meal.slice(1)}
                     </p>
-                    <p className="text-xs text-gray-500">{items.length} item(s)</p>
+                    <p className="text-xs text-gray-500">
+                      {items.length} item(s)
+                    </p>
                   </div>
 
                   {items.length === 0 ? (
-                    <p className="text-xs text-gray-500">No items for this meal.</p>
+                    <p className="text-xs text-gray-500">
+                      No items for this meal.
+                    </p>
                   ) : (
                     <ul className="text-sm space-y-1">
                       {items.map((food, i) => (
@@ -333,7 +396,10 @@ const DashboardHome = () => {
                           key={i}
                           className="flex justify-between text-gray-700"
                         >
-                          {food.name || food.title}
+                          {food.name ||
+                            food.title ||
+                            food["Food Item"] ||
+                            "Food item"}
                           {food.nutritionPerServing?.caloriesKcal && (
                             <span className="text-xs text-gray-500">
                               {food.nutritionPerServing.caloriesKcal} kcal
@@ -351,17 +417,16 @@ const DashboardHome = () => {
 
         {/* CLINICAL REPORTS */}
         <div className="bg-[#E8E2D9] rounded-xl p-6 shadow-sm">
-
           <h2 className="font-semibold text-gray-800 mb-3">
             Medical Reports & Prescriptions
           </h2>
 
-          {!primaryRecord?.clinicalReports?.length ? (
+          {!latestRecord?.clinicalReports?.length ? (
             <div className="bg-white border rounded-xl shadow-sm p-4 text-sm text-gray-600">
               No consultation notes available yet.
             </div>
           ) : (
-            primaryRecord.clinicalReports.map((rep, idx) => (
+            latestRecord.clinicalReports.map((rep, idx) => (
               <div
                 key={rep._id || idx}
                 className="bg-white border rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition mb-4"
@@ -391,93 +456,135 @@ const DashboardHome = () => {
           )}
         </div>
       </div>
-      {/* -----------------------------------------------------------
-   📌 FULL-WIDTH HEALTH TIMELINE (Appointments + Reports)
------------------------------------------------------------- */}
-<div className="mt-12 bg-[#E8E2D9] rounded-xl p-6 shadow-sm">
-  <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-    Your Health Timeline
-  </h2>
 
-  {/* Build unified timeline */}
-  {(() => {
-    const reports = primaryRecord?.clinicalReports || [];
-    const appts = appointments || [];
+      {/* WEEKLY PLAN BLOCK */}
+      <div className="mt-10">
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">
+          Weekly Diet & Exercise Plan
+        </h2>
 
-    const combined = [
-      ...reports.map((r) => ({
-        type: "report",
-        date: r.createdAt,
-        title: r.title || "Clinical Report",
-        description: r.summary || r.diagnosis || "Doctor’s note added",
-        data: r,
-      })),
-      ...appts.map((a) => ({
-        type: "appointment",
-        date: a.createdAt,
-        title: a.condition || "Appointment",
-        description: `Consultation with doctor`,
-        data: a,
-      })),
-    ].sort((a, b) => new Date(b.date) - new Date(a.date)); // latest first
-
-    if (combined.length === 0) {
-      return (
-        <p className="text-gray-600 bg-white p-4 rounded-xl border shadow-sm">
-          No medical activity recorded yet.
-        </p>
-      );
-    }
-
-    return (
-      <div className="relative border-l-2 border-green-600 pl-6 space-y-8">
-        {combined.map((event, i) => (
-          <div key={i} className="relative">
-            {/* Dot */}
-            <div className="absolute -left-[11px] w-5 h-5 bg-green-600 rounded-full border-2 border-white"></div>
-
-            {/* Content */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border">
-              <p className="text-xs text-gray-500">
-                {new Date(event.date).toLocaleString()}
-              </p>
-
-              <h3 className="text-lg font-semibold text-gray-800 mt-1 flex items-center gap-2">
-                {event.type === "report" ? "📝" : "📅"} {event.title}
-              </h3>
-
-              <p className="text-sm text-gray-600 mt-1">{event.description}</p>
-
-              {/* View button for reports */}
-              {event.type === "report" && (
-                <button
-                  onClick={() => setSelectedReport(event.data)}
-                  className="text-green-700 underline text-sm mt-2"
-                >
-                  View Report
-                </button>
-              )}
-
-              {/* For appointments (future extensions) */}
-              {event.type === "appointment" && (
-                <p className="text-sm text-blue-700 mt-2">
-                  Appointment booked
-                </p>
-              )}
-            </div>
+        {weeklyLoading && (
+          <div className="text-sm text-gray-600">
+            Loading weekly plan…
           </div>
-        ))}
-      </div>
-    );
-  })()}
-</div>
+        )}
 
+        {!weeklyLoading && weeklyError && (
+          <div className="text-sm text-red-600">{weeklyError}</div>
+        )}
+
+        {!weeklyLoading &&
+          !weeklyError &&
+          clinicalPatientId &&
+          latestPlanId && (
+            <PatientWeekPlan
+              patientId={clinicalPatientId}
+              planId={latestPlanId}
+            />
+          )}
+
+        {!weeklyLoading &&
+          !weeklyError &&
+          clinicalPatientId &&
+          !latestPlanId && (
+            <div className="text-sm text-gray-500">
+              Your doctor has not assigned a weekly plan yet.
+            </div>
+          )}
+
+        {!clinicalPatientId && (
+          <div className="text-sm text-gray-500">
+            Your account is not yet linked to a clinical record. Weekly plans
+            will appear here once your doctor adds you.
+          </div>
+        )}
+      </div>
+
+      {/* HEALTH TIMELINE */}
+      <div className="mt-12 bg-[#E8E2D9] rounded-xl p-6 shadow-sm">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+          Your Health Timeline
+        </h2>
+
+        {(() => {
+          const reports = latestRecord?.clinicalReports || [];
+          const appts = appointments || [];
+
+          const combined = [
+            ...reports.map((r) => ({
+              type: "report",
+              date: r.createdAt,
+              title: r.title || "Clinical Report",
+              description:
+                r.summary || r.diagnosis || "Doctor’s note added",
+              data: r,
+            })),
+            ...appts.map((a) => ({
+              type: "appointment",
+              date: a.createdAt || a.date,
+              title: a.sessionType || "Appointment",
+              description: `Consultation with doctor`,
+              data: a,
+            })),
+          ].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+
+          if (combined.length === 0) {
+            return (
+              <p className="text-gray-600 bg-white p-4 rounded-xl border shadow-sm">
+                No medical activity recorded yet.
+              </p>
+            );
+          }
+
+          return (
+            <div className="relative border-l-2 border-green-600 pl-6 space-y-8">
+              {combined.map((event, i) => (
+                <div key={i} className="relative">
+                  {/* Dot */}
+                  <div className="absolute -left-[11px] w-5 h-5 bg-green-600 rounded-full border-2 border-white"></div>
+
+                  {/* Content */}
+                  <div className="bg-white p-4 rounded-xl shadow-sm border">
+                    <p className="text-xs text-gray-500">
+                      {new Date(event.date).toLocaleString()}
+                    </p>
+
+                    <h3 className="text-lg font-semibold text-gray-800 mt-1 flex items-center gap-2">
+                      {event.type === "report" ? "📝" : "📅"} {event.title}
+                    </h3>
+
+                    <p className="text-sm text-gray-600 mt-1">
+                      {event.description}
+                    </p>
+
+                    {event.type === "report" && (
+                      <button
+                        onClick={() => setSelectedReport(event.data)}
+                        className="text-green-700 underline text-sm mt-2"
+                      >
+                        View Report
+                      </button>
+                    )}
+
+                    {event.type === "appointment" && (
+                      <p className="text-sm text-blue-700 mt-2">
+                        Appointment booked
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </div>
 
       {/* REPORT POPUP MODAL */}
       {selectedReport && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-xl w-full relative">
-
             {/* Close Button */}
             <button
               className="absolute top-3 right-3 text-gray-500 hover:text-black"
@@ -496,7 +603,6 @@ const DashboardHome = () => {
             </p>
 
             <div className="mt-4 space-y-3 text-gray-700 text-sm">
-
               {selectedReport.diagnosis && (
                 <div>
                   <p className="font-medium text-gray-800">Diagnosis</p>
@@ -507,13 +613,17 @@ const DashboardHome = () => {
               {selectedReport.notes && (
                 <div>
                   <p className="font-medium text-gray-800">Notes</p>
-                  <p className="whitespace-pre-line">{selectedReport.notes}</p>
+                  <p className="whitespace-pre-line">
+                    {selectedReport.notes}
+                  </p>
                 </div>
               )}
 
               {selectedReport.testsRecommended && (
                 <div>
-                  <p className="font-medium text-gray-800">Tests Recommended</p>
+                  <p className="font-medium text-gray-800">
+                    Tests Recommended
+                  </p>
                   <p>{selectedReport.testsRecommended}</p>
                 </div>
               )}
@@ -536,12 +646,16 @@ const DashboardHome = () => {
           </div>
         </div>
       )}
+
+      {overviewError && overview && (
+        <div className="mt-4 text-sm text-red-600">{overviewError}</div>
+      )}
     </div>
   );
 };
 
 // =========================================================
-// DOWNLOAD TXT REPORT (CAN BE UPGRADED TO PDF LATER)
+// DOWNLOAD TXT REPORT
 // =========================================================
 
 function downloadReport(rep) {
@@ -564,7 +678,9 @@ Treatment / Plan:
 ${rep.plan || "-"}
 
 Follow-up Date:
-${rep.followUpDate ? new Date(rep.followUpDate).toLocaleDateString() : "-"}
+${
+  rep.followUpDate ? new Date(rep.followUpDate).toLocaleDateString() : "-"
+}
 `;
 
   const blob = new Blob([content], { type: "text/plain" });

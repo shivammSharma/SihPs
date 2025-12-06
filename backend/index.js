@@ -35,11 +35,12 @@ const app = express();
 app.use(
   cors({
     origin: "http://localhost:4028",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
+app.options("*", cors());
 app.use(express.json());
 
 // --------------------------

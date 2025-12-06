@@ -11,6 +11,7 @@ import AyurvedicIntelligenceCenter from "./pages/ayurvedic-intelligence-center";
 import ClinicalResearchLibrary from "./pages/clinical-research-library";
 import PersonalWellnessHub from "./pages/personal-wellness-hub";
 import ProfessionalDashboardPortal from "./pages/professional-dashboard-portal";
+import DoctorWeekPlanner from "./pages/professional-dashboard-portal/components/DoctorWeekPlanner";
 
 import SignInPage from "./pages/sign-in/SignInPage";
 import SignInDoctor from "./pages/sign-in/SignInDoctor";
@@ -53,6 +54,10 @@ const AppRoutes = () => {
             element={<DoctorDietBuilderPage />}
           />
           <Route path="*" element={<NotFound />} />
+          <Route
+    path="/doctor/week-planner/:patientId"
+    element={<DoctorWeekPlanner />}
+  />
         </Routes>
       </ErrorBoundary>
     </BrowserRouter>

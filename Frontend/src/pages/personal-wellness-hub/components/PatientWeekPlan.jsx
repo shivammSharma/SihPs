@@ -1,3 +1,4 @@
+// src/pages/personal-wellness-hub/components/PatientWeekPlan.jsx
 import React, { useEffect, useState } from "react";
 import useAuth from "../../../hooks/useAuth";
 
@@ -5,6 +6,47 @@ const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:9000";
 
 const mealKeys = ["breakfast", "lunch", "dinner"];
+
+// today "YYYY-MM-DD"
+function getTodayStr() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// planned vs consumed macros for a day
+function computeDayNutritionSplit(day) {
+  const meals = day?.meals || {};
+  const result = {
+    assigned: { calories: 0, protein: 0, carbs: 0 },
+    consumed: { calories: 0, protein: 0, carbs: 0 },
+  };
+
+  mealKeys.forEach((k) => {
+    const arr = meals[k] || [];
+    arr.forEach((item) => {
+      const food = item.food || item || {};
+      const n = food.nutritionPerServing || {};
+      const cals = n.caloriesKcal || 0;
+      const prot = n.proteinG || 0;
+      const carbs = n.carbsG || 0;
+
+      result.assigned.calories += cals;
+      result.assigned.protein += prot;
+      result.assigned.carbs += carbs;
+
+      if (item.checked) {
+        result.consumed.calories += cals;
+        result.consumed.protein += prot;
+        result.consumed.carbs += carbs;
+      }
+    });
+  });
+
+  return result;
+}
 
 export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
   const { token } = useAuth();
@@ -15,7 +57,9 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
   const [err, setErr] = useState("");
   const [savingItem, setSavingItem] = useState(false);
 
-  // 1) Load plan (if no planId passed, pick latest automatically)
+  const todayStr = getTodayStr();
+
+  // load plan
   useEffect(() => {
     if (!token || !patientId) return;
 
@@ -26,7 +70,6 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
 
         let effectivePlanId = initialPlanId;
 
-        // If no planId provided, get all and pick latest
         if (!effectivePlanId) {
           const resList = await fetch(
             `${API_BASE}/api/patients/${patientId}/week-plans`,
@@ -60,7 +103,6 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
           setPlanId(effectivePlanId);
         }
 
-        // Now fetch a single plan by id
         const resOne = await fetch(
           `${API_BASE}/api/patients/${patientId}/week-plans/${effectivePlanId}`,
           {
@@ -73,7 +115,8 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
 
         if (!resOne.ok) {
           throw new Error(
-            bodyOne?.message || `Failed to load weekly plan (${resOne.status})`
+            bodyOne?.message ||
+              `Failed to load weekly plan (${resOne.status})`
           );
         }
 
@@ -90,7 +133,7 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
     load();
   }, [token, patientId, initialPlanId]);
 
-  // 2) Toggle checkbox
+  // toggle item
   const toggleItem = async (opts) => {
     if (!token || !plan || !planId) return;
     const { dayIndex, kind, mealKey, itemIndex, checked } = opts;
@@ -118,8 +161,6 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
       if (!res.ok) {
         throw new Error(body?.message || "Failed to update item");
       }
-
-      // backend returns { plan, progressPercent }
       setPlan(body.plan || plan);
     } catch (e) {
       console.error("toggleItem error:", e);
@@ -129,8 +170,7 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
     }
   };
 
-  // 3) Render helpers
-  const renderMealList = (day, mealKey, dayIndex) => {
+  const renderMealList = (day, mealKey, dayIndex, isPastDay) => {
     const arr = (day.meals && day.meals[mealKey]) || [];
     if (!arr.length) {
       return (
@@ -148,24 +188,31 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
             item.food?.["Food Item"] ||
             item.name ||
             "Food item";
+          const checked = !!item.checked;
+
           return (
             <li key={`${mealKey}-${idx}`} className="flex items-center gap-2">
               <input
                 type="checkbox"
                 className="h-3 w-3"
-                checked={!!item.checked}
-                onChange={(e) =>
+                checked={checked}
+                disabled={savingItem || isPastDay}
+                onChange={(e) => {
+                  if (isPastDay) return;
                   toggleItem({
                     dayIndex,
                     kind: "meal",
                     mealKey,
                     itemIndex: idx,
                     checked: e.target.checked,
-                  })
-                }
-                disabled={savingItem}
+                  });
+                }}
               />
-              <span className="text-[11px] text-gray-800 truncate">
+              <span
+                className={`text-[11px] truncate ${
+                  isPastDay ? "text-gray-400" : "text-gray-800"
+                }`}
+              >
                 {label}
               </span>
             </li>
@@ -175,7 +222,7 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
     );
   };
 
-  const renderExerciseList = (day, dayIndex) => {
+  const renderExerciseList = (day, dayIndex, isPastDay) => {
     const arr = day.exercises || [];
     if (!arr.length) {
       return (
@@ -187,34 +234,41 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
 
     return (
       <ul className="space-y-1">
-        {arr.map((ex, idx) => (
-          <li key={idx} className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              className="h-3 w-3"
-              checked={!!ex.checked}
-              onChange={(e) =>
-                toggleItem({
-                  dayIndex,
-                  kind: "exercise",
-                  itemIndex: idx,
-                  checked: e.target.checked,
-                })
-              }
-              disabled={savingItem}
-            />
-            <span className="text-[11px] text-gray-800 truncate">
-              {ex.name}{" "}
-              {ex.reps ? `• ${ex.reps}` : ""}{" "}
-              {ex.durationMinutes ? `• ${ex.durationMinutes} min` : ""}
-            </span>
-          </li>
-        ))}
+        {arr.map((ex, idx) => {
+          const checked = !!ex.checked;
+          return (
+            <li key={idx} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={checked}
+                disabled={savingItem || isPastDay}
+                onChange={(e) => {
+                  if (isPastDay) return;
+                  toggleItem({
+                    dayIndex,
+                    kind: "exercise",
+                    itemIndex: idx,
+                    checked: e.target.checked,
+                  });
+                }}
+              />
+              <span
+                className={`text-[11px] truncate ${
+                  isPastDay ? "text-gray-400" : "text-gray-800"
+                }`}
+              >
+                {ex.name}{" "}
+                {ex.reps ? `• ${ex.reps}` : ""}{" "}
+                {ex.durationMinutes ? `• ${ex.durationMinutes} min` : ""}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     );
   };
 
-  // 4) Render component
   if (loading && !plan) {
     return <div className="text-sm text-gray-600">Loading weekly plan…</div>;
   }
@@ -246,7 +300,7 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-gray-500">Progress</p>
+          <p className="text-xs text-gray-500">Overall Progress</p>
           <p className="text-lg font-semibold text-emerald-700">
             {plan.progressPercent ?? 0}%
           </p>
@@ -254,40 +308,80 @@ export default function PatientWeekPlan({ patientId, planId: initialPlanId }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {plan.days?.map((day, dayIndex) => (
-          <div
-            key={day.date || dayIndex}
-            className="border rounded-lg p-3 bg-[#FAF5EE]"
-          >
-            <p className="text-xs font-semibold text-gray-800 mb-1">
-              {day.date
-                ? new Date(day.date).toLocaleDateString(undefined, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })
-                : `Day ${dayIndex + 1}`}
-            </p>
+        {plan.days?.map((day, dayIndex) => {
+          const dayStr = day?.date ? String(day.date).slice(0, 10) : "";
+          const isPastDay = dayStr && dayStr < todayStr;
+          const isToday = dayStr === todayStr;
 
-            {/* Meals */}
-            {mealKeys.map((mk) => (
-              <div key={mk} className="mt-1">
-                <p className="text-[11px] font-semibold capitalize text-gray-700">
-                  {mk}
+          const { assigned, consumed } = computeDayNutritionSplit(day);
+
+          return (
+            <div
+              key={day.date || dayIndex}
+              className="border rounded-lg p-3 bg-[#FAF5EE]"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold text-gray-800">
+                  {day.date
+                    ? new Date(day.date).toLocaleDateString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : `Day ${dayIndex + 1}`}
                 </p>
-                {renderMealList(day, mk, dayIndex)}
+                <div className="flex items-center gap-1">
+                  {isToday && (
+                    <span className="text-[10px] px-2 py-[1px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      Today
+                    </span>
+                  )}
+                  {isPastDay && (
+                    <span className="text-[10px] px-2 py-[1px] rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+                      Past
+                    </span>
+                  )}
+                </div>
               </div>
-            ))}
 
-            {/* Exercises */}
-            <div className="mt-2 border-t border-gray-200 pt-1">
-              <p className="text-[11px] font-semibold text-gray-700">
-                Exercise
-              </p>
-              {renderExerciseList(day, dayIndex)}
+              <div className="mb-2 text-[11px] text-gray-700 space-y-[2px]">
+                <div>
+                  <span className="font-semibold">Planned:</span>{" "}
+                  {Math.round(assigned.calories)} kcal ·{" "}
+                  {Math.round(assigned.protein)}g protein ·{" "}
+                  {Math.round(assigned.carbs)}g carbs
+                </div>
+                <div>
+                  <span className="font-semibold">Completed:</span>{" "}
+                  {Math.round(consumed.calories)} kcal ·{" "}
+                  {Math.round(consumed.protein)}g protein ·{" "}
+                  {Math.round(consumed.carbs)}g carbs
+                </div>
+                {isPastDay && (
+                  <p className="text-[10px] text-gray-500">
+                    Past day – checkboxes are locked.
+                  </p>
+                )}
+              </div>
+
+              {mealKeys.map((mk) => (
+                <div key={mk} className="mt-1">
+                  <p className="text-[11px] font-semibold capitalize text-gray-700">
+                    {mk}
+                  </p>
+                  {renderMealList(day, mk, dayIndex, isPastDay)}
+                </div>
+              ))}
+
+              <div className="mt-2 border-top border-gray-200 pt-1">
+                <p className="text-[11px] font-semibold text-gray-700">
+                  Exercise
+                </p>
+                {renderExerciseList(day, dayIndex, isPastDay)}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {savingItem && (
